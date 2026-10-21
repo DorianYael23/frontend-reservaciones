@@ -3,8 +3,9 @@ import HotelesCrud from './components/HotelesCrud';
 import TiposCrud from './components/TiposCrud';
 import HabitacionesCrud from './components/HabitacionesCrud';
 import ConsultasView from './components/ConsultasView';
+import AsistenteIaView from './components/AsistenteIaView';
 
-type ModuloActivo = 'hoteles' | 'tipos' | 'habitaciones' | 'consultas';
+type ModuloActivo = 'hoteles' | 'tipos' | 'habitaciones' | 'consultas' | 'ia';
 
 type Modulo = {
   id: ModuloActivo;
@@ -37,6 +38,12 @@ const MODULOS: Modulo[] = [
     titulo: 'Consultas y Reportes',
     descripcion: 'Disponibilidad y filtros',
     icono: 'bi-search-heart',
+  },
+  {
+    id: 'ia',
+    titulo: 'Asistente IA',
+    descripcion: 'Consultas en lenguaje natural',
+    icono: 'bi-robot',
   },
 ];
 
@@ -105,6 +112,7 @@ function App() {
         {vista === 'tipos' && <TiposCrud />}
         {vista === 'habitaciones' && <HabitacionesCrud />}
         {vista === 'consultas' && <ConsultasView />}
+        {vista === 'ia' && <AsistenteIaView />}
       </main>
     </div>
   );

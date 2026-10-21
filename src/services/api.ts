@@ -120,3 +120,22 @@ export const consultarConteoDisponibles = async () => {
     const res = await fetch(`${API_URL}/habitaciones/consultas/conteo-disponibles`);
     return procesarRespuesta(res);
 };
+
+// ==========================================
+// 4. SERVICIO DE INTELIGENCIA ARTIFICIAL (SPRING AI)
+// ==========================================
+export const preguntarAsistenteIA = async (
+    pregunta: string,
+    modelo: string = 'gemini'
+): Promise<{ respuesta: string; modeloUsado: string; tiempoMs: number }> => {
+    const res = await fetch(`http://localhost:8082/api/hotel-ai/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pregunta, modelo }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        throw data;
+    }
+    return data;
+};
