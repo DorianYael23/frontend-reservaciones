@@ -7,11 +7,13 @@ import ConsultasView from './components/ConsultasView';
 import AsistenteIaView from './components/AsistenteIaView';
 import UsuariosCrud from './components/UsuariosCrud';
 import LoginView, { type SesionUsuario } from './components/LoginView';
+import CatalogoHabitacionesView from './components/CatalogoHabitacionesView';
 
 type ModuloActivo =
   | 'hoteles'
   | 'tipos'
   | 'habitaciones'
+  | 'catalogo'
   | 'reservaciones'
   | 'consultas'
   | 'usuarios'
@@ -83,9 +85,16 @@ const MODULOS: Modulo[] = [
     rolesPermitidos: ['ADMIN'],
   },
   {
+    id: 'catalogo',
+    titulo: 'Explorar Estancias',
+    descripcion: 'Fotos, tarifas y reservas directas',
+    icono: 'bi-compass-fill',
+    rolesPermitidos: ['ADMIN', 'HUESPED'],
+  },
+  {
     id: 'reservaciones',
-    titulo: 'Reservaciones',
-    descripcion: 'Control de estancias y huéspedes',
+    titulo: 'Mis Reservaciones',
+    descripcion: 'Control de estancias y pagos',
     icono: 'bi-calendar2-check-fill',
     rolesPermitidos: ['ADMIN', 'HUESPED'],
   },
@@ -124,11 +133,11 @@ function App() {
     }
   });
 
-  const [vista, setVista] = useState<ModuloActivo>('reservaciones');
+  const [vista, setVista] = useState<ModuloActivo>('catalogo');
 
   useEffect(() => {
     if (sesion) {
-      setVista(sesion.rol === 'ADMIN' ? 'hoteles' : 'reservaciones');
+      setVista(sesion.rol === 'ADMIN' ? 'hoteles' : 'catalogo');
     }
   }, [sesion]);
 
@@ -217,10 +226,19 @@ function App() {
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="page-container pt-4">
+      <main className="page-container">
         {sesion.rol === 'ADMIN' && vista === 'hoteles' && <HotelesCrud />}
         {sesion.rol === 'ADMIN' && vista === 'tipos' && <TiposCrud />}
         {sesion.rol === 'ADMIN' && vista === 'habitaciones' && <HabitacionesCrud />}
+
+        {/* Catálogo de habitaciones disponible para huéspedes */}
+        {vista === 'catalogo' && (
+          <CatalogoHabitacionesView
+            sesion={sesion}
+            onReservacionExitosa={() => setVista('reservaciones')}
+          />
+        )}
+
         {vista === 'reservaciones' && <ReservacionesCrud sesion={sesion} />}
         {sesion.rol === 'ADMIN' && vista === 'consultas' && <ConsultasView />}
         {sesion.rol === 'ADMIN' && vista === 'usuarios' && <UsuariosCrud />}

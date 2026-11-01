@@ -55,13 +55,13 @@ body {
   background: transparent;
   color: var(--ink-muted);
   font-weight: 500;
-  font-size: 0.88rem;
-  padding: 0.5rem 1.1rem;
+  font-size: 0.82rem;
+  padding: 0.42rem 0.85rem;
   border-radius: 8px;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   white-space: nowrap;
   flex-shrink: 0;
   cursor: pointer;
@@ -83,10 +83,11 @@ body {
 }
 
 /* Contenedor Principal Full Width */
+/* Contenedor Principal Full Width */
 .page-container {
-  max-width: 1340px;
+  max-width: 1600px;           /* Se expande mucho mejor en tu monitor de 27" */
   margin: 0 auto;
-  padding: 2.2rem 2rem;
+  padding: 1.2rem 1.5rem;      /* Reducimos el padding vertical para eliminar el scroll fantasma */
 }
 
 /* Tarjetas Limpias */
@@ -354,9 +355,9 @@ body {
 }
 
 .exec-container {
-  max-width: 1340px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 1.5rem;
 }
 
 /* Barra superior con efecto cristal ahumado y destello dorado */
