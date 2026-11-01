@@ -492,12 +492,12 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
   };
 
   return (
-    <div className="container-fluid py-3">
-      <div className="row g-4">
+    <div className="container-fluid py-0">
+      <div className="row g-3">
         {/* COLUMNA IZQUIERDA */}
         <div
           className="col-12 col-lg-4 d-flex flex-column gap-3"
-          style={{ height: "78vh", minHeight: "560px" }}
+          style={{ height: "calc(100vh - 215px)" }}
         >
           <div className="card border-0 shadow-sm rounded-4 p-3">
             <div className="d-flex align-items-center gap-2 mb-2 fw-semibold text-dark">
@@ -509,20 +509,18 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
               <button
                 type="button"
                 onClick={() => setModelo("gemini")}
-                className={`btn btn-sm rounded-2 fw-medium ${
-                  modelo === "gemini" ? "bg-white shadow-sm text-dark" : "text-secondary border-0"
-                }`}
+                className={`btn btn-sm rounded-2 fw-medium ${modelo === "gemini" ? "bg-white shadow-sm text-dark" : "text-secondary border-0"
+                  }`}
               >
                 <i className="bi bi-cloud me-1"></i> Gemini
               </button>
               <button
                 type="button"
                 onClick={() => setModelo("llama3.2:3b")}
-                className={`btn btn-sm rounded-2 fw-medium ${
-                  modelo === "llama3.2:3b"
-                    ? "bg-white shadow-sm text-dark"
-                    : "text-secondary border-0"
-                }`}
+                className={`btn btn-sm rounded-2 fw-medium ${modelo === "llama3.2:3b"
+                  ? "bg-white shadow-sm text-dark"
+                  : "text-secondary border-0"
+                  }`}
               >
                 <i className="bi bi-pc-display me-1"></i> Llama 3.2
               </button>
@@ -574,11 +572,10 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                     key={conv.id}
                     onClick={() => setActiveConvId(conv.id)}
                     style={{ cursor: "pointer" }}
-                    className={`d-flex justify-content-between align-items-center p-2 rounded-3 border ${
-                      esActiva
-                        ? "bg-dark text-white border-dark"
-                        : "bg-light text-dark border-light-subtle"
-                    }`}
+                    className={`d-flex justify-content-between align-items-center p-2 rounded-3 border ${esActiva
+                      ? "bg-dark text-white border-dark"
+                      : "bg-light text-dark border-light-subtle"
+                      }`}
                   >
                     <div className="text-truncate me-2" style={{ maxWidth: "82%" }}>
                       <div className="small fw-medium text-truncate">
@@ -595,9 +592,8 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                     <button
                       type="button"
                       onClick={(e) => solicitarEliminarConversacion(conv, e)}
-                      className={`btn btn-sm border-0 p-1 ${
-                        esActiva ? "text-white-50" : "text-secondary"
-                      }`}
+                      className={`btn btn-sm border-0 p-1 ${esActiva ? "text-white-50" : "text-secondary"
+                        }`}
                       title="Eliminar conversación"
                     >
                       <i className="bi bi-trash3"></i>
@@ -613,7 +609,7 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
         <div className="col-12 col-lg-8">
           <div
             className="card border-0 shadow-sm rounded-4 d-flex flex-column"
-            style={{ height: "78vh", minHeight: "560px" }}
+            style={{ height: "calc(100vh - 215px)" }}
           >
             <div className="card-header bg-white border-bottom p-3 d-flex justify-content-between align-items-center rounded-top-4">
               <div className="d-flex align-items-center gap-3">
@@ -792,9 +788,8 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                   type="button"
                   disabled={loading}
                   onClick={alternarDictadoPorVoz}
-                  className={`btn rounded-3 px-3 py-2 d-flex align-items-center justify-content-center ${
-                    escuchandoVoz ? "btn-danger" : "btn-outline-dark"
-                  }`}
+                  className={`btn rounded-3 px-3 py-2 d-flex align-items-center justify-content-center ${escuchandoVoz ? "btn-danger" : "btn-outline-dark"
+                    }`}
                   title={
                     escuchandoVoz
                       ? "Detener dictado por voz"

@@ -77,30 +77,33 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
-  // Estados de notificaciones flotantes y alerta en formulario
+  // Notificaciones flotantes
   const [exito, setExito] = useState<string | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
-  const [errorForm, setErrorForm] = useState<string | null>(null);
+  const [errorModal, setErrorModal] = useState<string | null>(null);
 
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [editandoId, setEditandoId] = useState<number | null>(null);
-  const [folioActual, setFolioActual] = useState<string>("");
-
-  // Estado para el modal de confirmación al eliminar una reservación
+  // Modales
+  const [modalFormAbierto, setModalFormAbierto] = useState(false);
   const [reservacionAEliminar, setReservacionAEliminar] = useState<Reservacion | null>(null);
+  const [reservacionAPagar, setReservacionAPagar] = useState<Reservacion | null>(null);
 
-  // 1. Datos del huésped
+  // Estados para el formulario (Crear/Editar Admin)
+  const [editandoId, setEditandoId] = useState<number | null>(null);
   const [nombreCliente, setNombreCliente] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-
-  // 2. Estancia y Estado
   const [fechaEntrada, setFechaEntrada] = useState(hoyIso);
   const [fechaSalida, setFechaSalida] = useState(obtenerFechaLocalIso(1, hoyIso));
   const [idTipoFiltro, setIdTipoFiltro] = useState<number | "">("");
   const [idHabitacion, setIdHabitacion] = useState<number | "">("");
   const [numHuespedes, setNumHuespedes] = useState<number>(1);
   const [estado, setEstado] = useState<EstadoReservacion>("Pendiente");
+
+  // Estados para el modal de pago simulado
+  const [numTarjeta, setNumTarjeta] = useState("");
+  const [expiracion, setExpiracion] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [procesandoPago, setProcesandoPago] = useState(false);
 
   const formatoMoneda = (valor: number) =>
     new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(valor || 0);
@@ -129,7 +132,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
     cargarDatos();
   }, [sesion?.id_usuario]);
 
-  // Auto-cierre de notificaciones flotantes a los 3.5 segundos
   useEffect(() => {
     if (exito || errorBanner) {
       const timer = setTimeout(() => {
@@ -155,7 +157,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
 
   const abrirFormularioNuevo = () => {
     setEditandoId(null);
-    setFolioActual("");
     setNombreCliente(!esAdmin && sesion?.nombre ? sesion.nombre : "");
     setTelefono("");
     setEmail(!esAdmin && sesion?.email ? sesion.email : "");
@@ -177,14 +178,13 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
     setIdHabitacion(disponibles.length > 0 ? disponibles[0].id_habitacion : "");
     setNumHuespedes(1);
     setEstado("Pendiente");
-    setErrorForm(null);
-    setMostrarFormulario(true);
+    setErrorModal(null);
+    setModalFormAbierto(true);
   };
 
   const abrirFormularioEditar = (res: Reservacion) => {
     if (!esAdmin) return;
     setEditandoId(res.id_reservacion || null);
-    setFolioActual(res.folio || `#${res.id_reservacion}`);
     setNombreCliente(res.nombre_cliente || "");
     setTelefono(res.telefono || "");
     setEmail(res.email || "");
@@ -194,8 +194,8 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
     setIdHabitacion(res.habitacion?.id_habitacion || "");
     setNumHuespedes(res.num_huespedes || 1);
     setEstado(res.estado || "Pendiente");
-    setErrorForm(null);
-    setMostrarFormulario(true);
+    setErrorModal(null);
+    setModalFormAbierto(true);
   };
 
   const manejarCambioEntrada = (nuevaEntrada: string) => {
@@ -261,10 +261,10 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
 
   const guardarReservacion = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorForm(null);
+    setErrorModal(null);
 
     if (!idHabitacion) {
-      setErrorForm("Selecciona un número de habitación disponible.");
+      setErrorModal("Selecciona un número de habitación disponible.");
       return;
     }
 
@@ -297,15 +297,15 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
           data.mensaje ||
           (data.errores && Object.values(data.errores).join(", ")) ||
           "No se pudo guardar la reservación.";
-        setErrorForm(msgError);
+        setErrorModal(msgError);
         return;
       }
 
       setExito(data.mensaje || "Reservación guardada exitosamente.");
-      setMostrarFormulario(false);
+      setModalFormAbierto(false);
       cargarDatos();
     } catch {
-      setErrorForm("Error de conexión con el servidor.");
+      setErrorModal("Error de conexión con el servidor.");
     } finally {
       setGuardando(false);
     }
@@ -316,8 +316,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
 
     if (hoyIso < res.fecha_entrada) {
       setErrorBanner(
-        `No se puede realizar el Check-in todavía: la reservación ${res.folio || "#" + res.id_reservacion
-        } tiene fecha de entrada para el ${res.fecha_entrada} (hoy es ${hoyIso}).`
+        `No se puede realizar Check-in: la reservación ${res.folio || "#" + res.id_reservacion} inicia el ${res.fecha_entrada} (hoy es ${hoyIso}).`
       );
       return;
     }
@@ -378,6 +377,49 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
     }
   };
 
+  // Procesar Pago Simulado del Huésped
+  const manejarPagoSimulado = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reservacionAPagar?.id_reservacion) return;
+    setProcesandoPago(true);
+
+    const payload = {
+      habitacion: { id_habitacion: reservacionAPagar.habitacion.id_habitacion },
+      nombre_cliente: reservacionAPagar.nombre_cliente,
+      telefono: reservacionAPagar.telefono,
+      email: reservacionAPagar.email || null,
+      fecha_entrada: reservacionAPagar.fecha_entrada,
+      fecha_salida: reservacionAPagar.fecha_salida,
+      num_huespedes: reservacionAPagar.num_huespedes,
+      estado: "Confirmada",
+    };
+
+    try {
+      const res = await fetch(`${API_RESERVACIONES}/${reservacionAPagar.id_reservacion}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorBanner(data.mensaje || "No se pudo procesar el pago.");
+        return;
+      }
+
+      setExito("¡Pago procesado con éxito! Reservación confirmada.");
+      setReservacionAPagar(null);
+      setNumTarjeta("");
+      setExpiracion("");
+      setCvv("");
+      cargarDatos();
+    } catch {
+      setErrorBanner("Error de conexión al procesar el pago.");
+    } finally {
+      setProcesandoPago(false);
+    }
+  };
+
   const renderBadgeEstado = (est: EstadoReservacion) => {
     switch (est) {
       case "Confirmada":
@@ -398,11 +440,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         return (
           <span
             className="badge-soft"
-            style={{
-              backgroundColor: "#18181b",
-              color: "#fbbf24",
-              border: "1px solid #3f3f46",
-            }}
+            style={{ backgroundColor: "#18181b", color: "#fbbf24", border: "1px solid #3f3f46" }}
           >
             <i className="bi bi-door-open-fill"></i>
             En Curso
@@ -433,323 +471,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
       (!idTipoFiltro || h.tipoHabitacion?.id_tipo === Number(idTipoFiltro))
   );
 
-  // =========================================================================
-  // VISTA DEL FORMULARIO DE RESERVACIÓN
-  // =========================================================================
-  if (mostrarFormulario) {
-    return (
-      <div className="mx-auto" style={{ maxWidth: "960px" }}>
-        <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
-          <div>
-            <span className="badge-soft badge-amber mb-2">
-              <i className="bi bi-calendar2-check"></i>
-              <span>Módulo de Reservaciones</span>
-            </span>
-            <h4 className="fw-bold mb-1">
-              {editandoId ? `Modificar Reservación ${folioActual}` : "Registrar Nueva Reservación"}
-            </h4>
-            <p className="text-muted small mb-0">
-              Completa la información del huésped y las fechas de estancia para calcular la tarifa.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMostrarFormulario(false)}
-            className="btn-luxury-outline d-inline-flex align-items-center gap-2"
-          >
-            <i className="bi bi-arrow-left"></i>
-            <span>Volver al listado</span>
-          </button>
-        </div>
-
-        {errorForm && (
-          <div className="login-alert login-alert-danger mb-4">
-            <i className="bi bi-exclamation-triangle-fill"></i>
-            <div>{errorForm}</div>
-          </div>
-        )}
-
-        <form onSubmit={guardarReservacion} className="d-flex flex-column gap-4">
-          {/* SECCIÓN 1: DATOS DEL HUÉSPED */}
-          <div className="luxury-card">
-            <div className="luxury-card-header">
-              <div className="d-flex align-items-center gap-3">
-                <div className="brand-badge">
-                  <i className="bi bi-person-vcard"></i>
-                </div>
-                <div>
-                  <h6 className="fw-bold mb-0">Datos del Huésped</h6>
-                  <small className="text-muted">
-                    Información de contacto para el registro y envío de confirmación.
-                  </small>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4">
-              <div className="row g-3">
-                <div className="col-12">
-                  <label className="input-label">
-                    Nombre Completo <span className="login-req">*</span>
-                  </label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-person login-input-icon"></i>
-                    <input
-                      type="text"
-                      className="input-luxury"
-                      placeholder="Ej. María López García"
-                      required
-                      value={nombreCliente}
-                      onChange={(e) => setNombreCliente(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-12 col-md-6">
-                  <label className="input-label">
-                    Teléfono de Contacto <span className="login-req">*</span>
-                  </label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-telephone login-input-icon"></i>
-                    <input
-                      type="tel"
-                      className="input-luxury"
-                      placeholder="Ej. 55 1234 5678"
-                      required
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-12 col-md-6">
-                  <label className="input-label">Correo Electrónico (Opcional)</label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-envelope login-input-icon"></i>
-                    <input
-                      type="email"
-                      className="input-luxury"
-                      placeholder="nombre@correo.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SECCIÓN 2: ESTANCIA Y HABITACIÓN */}
-          <div className="luxury-card">
-            <div className="luxury-card-header">
-              <div className="d-flex align-items-center gap-3">
-                <div className="brand-badge">
-                  <i className="bi bi-calendar-range"></i>
-                </div>
-                <div>
-                  <h6 className="fw-bold mb-0">Configuración de Estancia</h6>
-                  <small className="text-muted">
-                    Selección de fechas, categoría tarifaria y asignación de habitación.
-                  </small>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4">
-              <div className="row g-3 align-items-end">
-                <div className="col-12 col-md-6">
-                  <label className="input-label">
-                    Fecha de Entrada (Check-in) <span className="login-req">*</span>
-                  </label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-calendar-event login-input-icon"></i>
-                    <input
-                      type="date"
-                      className="input-luxury"
-                      required
-                      min={editandoId ? undefined : hoyIso}
-                      value={fechaEntrada}
-                      onChange={(e) => manejarCambioEntrada(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-12 col-md-6">
-                  <label className="input-label">
-                    Fecha de Salida (Check-out) <span className="login-req">*</span>
-                  </label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-calendar-check login-input-icon"></i>
-                    <input
-                      type="date"
-                      className="input-luxury"
-                      required
-                      min={obtenerFechaLocalIso(1, fechaEntrada)}
-                      value={fechaSalida}
-                      onChange={(e) => setFechaSalida(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-12 col-md-4">
-                  <label className="input-label">Filtrar por Categoría</label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-tags login-input-icon"></i>
-                    <select
-                      className="input-luxury"
-                      value={idTipoFiltro}
-                      onChange={(e) => manejarCambioTipo(e.target.value)}
-                    >
-                      <option value="">Todas las categorías</option>
-                      {tiposHabitacion.map((t) => (
-                        <option key={t.id_tipo} value={t.id_tipo}>
-                          {t.nombre} · {formatoMoneda(t.precio_base)}/noche (Máx. {t.capacidad})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="col-12 col-md-5">
-                  <label className="input-label">
-                    Habitación Asignada <span className="login-req">*</span>
-                  </label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-door-open login-input-icon"></i>
-                    <select
-                      className="input-luxury"
-                      required
-                      value={idHabitacion}
-                      onChange={(e) => manejarCambioHabitacion(e.target.value)}
-                    >
-                      <option value="">Seleccione habitación (Ej. 204)...</option>
-                      {habitacionesFiltradasPorTipo.map((h) => {
-                        const ocupadaEnFechas = tieneTraslapeEnFechas(
-                          h.id_habitacion,
-                          fechaEntrada,
-                          fechaSalida,
-                          editandoId
-                        );
-                        return (
-                          <option
-                            key={h.id_habitacion}
-                            value={h.id_habitacion}
-                            disabled={ocupadaEnFechas}
-                          >
-                            Hab. #{h.numero} — {h.hotel?.nombre} (Piso {h.piso})
-                            {ocupadaEnFechas ? " [Reservada en estas fechas]" : ""}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="col-12 col-md-3">
-                  <label className="input-label">
-                    No. de Huéspedes (Máx. {capacidadMax})
-                  </label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-people login-input-icon"></i>
-                    <input
-                      type="number"
-                      className="input-luxury"
-                      min={1}
-                      max={capacidadMax}
-                      required
-                      value={numHuespedes}
-                      onChange={(e) => setNumHuespedes(Math.max(1, Number(e.target.value)))}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-12 col-md-6 mt-4">
-                  <label className="input-label">Estatus de Pago / Reservación</label>
-                  <div className="login-input-wrap">
-                    <i className="bi bi-credit-card-2-front login-input-icon"></i>
-                    <select
-                      className="input-luxury"
-                      value={esAdmin ? estado : "Pendiente"}
-                      disabled={!esAdmin}
-                      onChange={(e) => setEstado(e.target.value as EstadoReservacion)}
-                    >
-                      <option value="Pendiente">Pendiente (Por pagar)</option>
-                      <option value="Confirmada">Confirmada (Pago confirmado)</option>
-                      <option value="En Curso" disabled={hoyIso < fechaEntrada}>
-                        En Curso (Check-in realizado)
-                      </option>
-                      <option value="Finalizada">Finalizada</option>
-                      <option value="Cancelada">Cancelada</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* RESUMEN EJECUTIVO DE TARIFA */}
-                <div className="col-12 col-md-6 ms-auto mt-4">
-                  <div
-                    className="rounded-4 p-3 d-flex justify-content-between align-items-center text-white"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 85% 50%, rgba(251, 191, 36, 0.16), transparent 45%), #18181b",
-                      border: "1px solid #27272a",
-                    }}
-                  >
-                    <div className="pe-3" style={{ borderRight: "1px solid #3f3f46" }}>
-                      <div
-                        className="text-uppercase fw-semibold"
-                        style={{ fontSize: "0.7rem", letterSpacing: "0.06em", color: "#a1a1aa" }}
-                      >
-                        Noches de Estancia
-                      </div>
-                      <div className="fs-5 fw-bold text-white mt-1">
-                        <i className="bi bi-moon-stars me-2" style={{ color: "#fbbf24" }}></i>
-                        {noches} {noches === 1 ? "noche" : "noches"}
-                      </div>
-                    </div>
-                    <div className="text-end ps-3">
-                      <div
-                        className="text-uppercase fw-semibold"
-                        style={{ fontSize: "0.7rem", letterSpacing: "0.06em", color: "#a1a1aa" }}
-                      >
-                        Monto Total Estimado
-                      </div>
-                      <div className="fs-4 fw-bold mt-1" style={{ color: "#fbbf24" }}>
-                        {formatoMoneda(montoTotal)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-window-footer">
-              <button
-                type="button"
-                onClick={() => setMostrarFormulario(false)}
-                className="btn-luxury-outline"
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn-luxury-primary" disabled={guardando}>
-                <i className="bi bi-check2-circle"></i>
-                <span>
-                  {guardando
-                    ? "Guardando..."
-                    : editandoId
-                      ? "Actualizar Reservación"
-                      : "Guardar Reservación"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    );
-  }
-
-  // =========================================================================
-  // VISTA PRINCIPAL: KPIs Y TABLA DE RESERVACIONES
-  // =========================================================================
   const totalPendientesConfirmadas = reservaciones.filter(
     (r) => r.estado === "Pendiente" || r.estado === "Confirmada"
   ).length;
@@ -757,7 +478,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
 
   return (
     <div>
-      {/* NOTIFICACIONES FLOTANTES */}
+      {/* NOTIFICACIONES TOAST */}
       {exito && (
         <div className="toast-alert alert alert-success border-0 rounded-4 shadow-sm d-flex justify-content-between align-items-center mb-4">
           <div>
@@ -777,7 +498,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       )}
 
-      {/* FRANJA DE INDICADORES (KPI STRIP) */}
+      {/* STRIP DE KPIS */}
       <div className="row g-3 mb-4">
         <div className="col-12 col-md-4">
           <div className="stat-box d-flex justify-content-between align-items-center shadow-sm">
@@ -822,7 +543,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       </div>
 
-      {/* TARJETA DE TABLA PRINCIPAL */}
+      {/* TABLA PRINCIPAL */}
       <div className="luxury-card">
         <div className="luxury-card-header">
           <div>
@@ -834,7 +555,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
             <p className="text-muted small mb-0">
               {esAdmin
                 ? "Gestiona todas las reservaciones, confirmaciones de pago y Check-in en recepción."
-                : "Si deseas realizar, modificar o cancelar una reservación, solicítalo directamente en el Asistente IA."}
+                : "Historial de reservaciones realizadas. Puedes pagar en línea las que estén pendientes."}
             </p>
           </div>
 
@@ -946,9 +667,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                             {res.estado === "Pendiente" ? (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  // Botón de pago aún sin acción activa por el momento
-                                }}
+                                onClick={() => setReservacionAPagar(res)}
                                 className="btn-luxury-primary py-1 px-3 small"
                                 title="Realizar pago de la reservación"
                               >
@@ -963,7 +682,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                                 disabled
                                 className="btn-luxury-outline py-1 px-3 small opacity-50"
                                 style={{ cursor: "not-allowed" }}
-                                title="El pago de esta reservación ya se encuentra confirmado"
                               >
                                 <i className="bi bi-lock-fill me-1"></i>
                                 Confirmada
@@ -992,8 +710,8 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                                 }
                                 title={
                                   puedeHacerCheckInHoy
-                                    ? "Registrar entrada del huésped y ocupar habitación"
-                                    : `El Check-in se habilita el día de entrada (${res.fecha_entrada})`
+                                    ? "Registrar entrada del huésped"
+                                    : `Check-in disponible a partir de ${res.fecha_entrada}`
                                 }
                               >
                                 <i className="bi bi-box-arrow-in-right"></i>
@@ -1017,7 +735,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                               type="button"
                               onClick={() => abrirFormularioEditar(res)}
                               className="action-icon-btn"
-                              title="Editar o confirmar pago"
+                              title="Editar o modificar estancia"
                             >
                               <i className="bi bi-pencil"></i>
                             </button>
@@ -1041,12 +759,416 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       </div>
 
-      {/* MODAL DE CONFIRMACIÓN PARA ELIMINAR RESERVACIÓN */}
+      {/* =========================================================================
+          MODAL 1: FORMULARIO CREAR / EDITAR RESERVACIÓN (ADMIN)
+         ========================================================================= */}
+      {modalFormAbierto && (
+        <div className="modal-backdrop-custom" onClick={() => setModalFormAbierto(false)}>
+          <div
+            className="modal-window"
+            style={{ maxWidth: "660px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-window-header">
+              <h6 className="fw-bold mb-0">
+                {editandoId ? `Modificar Reservación #${editandoId}` : "Registrar Nueva Reservación"}
+              </h6>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setModalFormAbierto(false)}
+              ></button>
+            </div>
+
+            <form onSubmit={guardarReservacion}>
+              <div className="modal-window-body">
+                {errorModal && (
+                  <div className="login-alert login-alert-danger mb-3">
+                    <i className="bi bi-exclamation-triangle-fill"></i>
+                    <div>{errorModal}</div>
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <label className="input-label">
+                    Nombre Completo <span className="login-req">*</span>
+                  </label>
+                  <div className="login-input-wrap">
+                    <i className="bi bi-person login-input-icon"></i>
+                    <input
+                      type="text"
+                      className="input-luxury"
+                      placeholder="Ej. María López García"
+                      required
+                      value={nombreCliente}
+                      onChange={(e) => setNombreCliente(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="row g-3 mb-3">
+                  <div className="col-md-6">
+                    <label className="input-label">
+                      Teléfono <span className="login-req">*</span>
+                    </label>
+                    <div className="login-input-wrap">
+                      <i className="bi bi-telephone login-input-icon"></i>
+                      <input
+                        type="tel"
+                        className="input-luxury"
+                        placeholder="Ej. 55 1234 5678"
+                        required
+                        value={telefono}
+                        onChange={(e) => setTelefono(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="input-label">Correo Electrónico (Opcional)</label>
+                    <div className="login-input-wrap">
+                      <i className="bi bi-envelope login-input-icon"></i>
+                      <input
+                        type="email"
+                        className="input-luxury"
+                        placeholder="nombre@correo.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row g-3 mb-3">
+                  <div className="col-md-6">
+                    <label className="input-label">
+                      Fecha Entrada (Check-in) <span className="login-req">*</span>
+                    </label>
+                    <div className="login-input-wrap">
+                      <i className="bi bi-calendar-event login-input-icon"></i>
+                      <input
+                        type="date"
+                        className="input-luxury"
+                        required
+                        min={editandoId ? undefined : hoyIso}
+                        value={fechaEntrada}
+                        onChange={(e) => manejarCambioEntrada(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="input-label">
+                      Fecha Salida (Check-out) <span className="login-req">*</span>
+                    </label>
+                    <div className="login-input-wrap">
+                      <i className="bi bi-calendar-check login-input-icon"></i>
+                      <input
+                        type="date"
+                        className="input-luxury"
+                        required
+                        min={obtenerFechaLocalIso(1, fechaEntrada)}
+                        value={fechaSalida}
+                        onChange={(e) => setFechaSalida(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row g-3 mb-3">
+                  <div className="col-md-6">
+                    <label className="input-label">Categoría Tarifaria</label>
+                    <div className="login-input-wrap">
+                      <i className="bi bi-tags login-input-icon"></i>
+                      <select
+                        className="input-luxury"
+                        value={idTipoFiltro}
+                        onChange={(e) => manejarCambioTipo(e.target.value)}
+                      >
+                        <option value="">Todas las categorías</option>
+                        {tiposHabitacion.map((t) => (
+                          <option key={t.id_tipo} value={t.id_tipo}>
+                            {t.nombre} · {formatoMoneda(t.precio_base)}/noche
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="input-label">
+                      Habitación Asignada <span className="login-req">*</span>
+                    </label>
+                    <div className="login-input-wrap">
+                      <i className="bi bi-door-open login-input-icon"></i>
+                      <select
+                        className="input-luxury"
+                        required
+                        value={idHabitacion}
+                        onChange={(e) => manejarCambioHabitacion(e.target.value)}
+                      >
+                        <option value="">Seleccione habitación...</option>
+                        {habitacionesFiltradasPorTipo.map((h) => {
+                          const ocupada = tieneTraslapeEnFechas(
+                            h.id_habitacion,
+                            fechaEntrada,
+                            fechaSalida,
+                            editandoId
+                          );
+                          return (
+                            <option
+                              key={h.id_habitacion}
+                              value={h.id_habitacion}
+                              disabled={ocupada}
+                            >
+                              Hab. #{h.numero} — {h.hotel?.nombre} (Piso {h.piso})
+                              {ocupada ? " [Ocupada]" : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row g-3 mb-3">
+                  <div className="col-md-6">
+                    <label className="input-label">
+                      No. Huéspedes (Máx. {capacidadMax})
+                    </label>
+                    <div className="login-input-wrap">
+                      <i className="bi bi-people login-input-icon"></i>
+                      <input
+                        type="number"
+                        className="input-luxury"
+                        min={1}
+                        max={capacidadMax}
+                        required
+                        value={numHuespedes}
+                        onChange={(e) => setNumHuespedes(Math.max(1, Number(e.target.value)))}
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="input-label">Estatus de Pago / Cuenta</label>
+                    <div className="login-input-wrap">
+                      <i className="bi bi-credit-card-2-front login-input-icon"></i>
+                      <select
+                        className="input-luxury"
+                        value={esAdmin ? estado : "Pendiente"}
+                        disabled={!esAdmin}
+                        onChange={(e) => setEstado(e.target.value as EstadoReservacion)}
+                      >
+                        <option value="Pendiente">Pendiente (Por pagar)</option>
+                        <option value="Confirmada">Confirmada (Pago acreditado)</option>
+                        <option value="En Curso" disabled={hoyIso < fechaEntrada}>
+                          En Curso (Huésped en hotel)
+                        </option>
+                        <option value="Finalizada">Finalizada</option>
+                        <option value="Cancelada">Cancelada</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumen de Tarifa */}
+                <div
+                  className="rounded-4 p-3 d-flex justify-content-between align-items-center text-white mt-3"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 85% 50%, rgba(251, 191, 36, 0.16), transparent 45%), #18181b",
+                    border: "1px solid #27272a",
+                  }}
+                >
+                  <div>
+                    <small className="text-white-50 d-block text-uppercase" style={{ fontSize: "0.7rem" }}>
+                      Estancia
+                    </small>
+                    <span className="fw-bold">
+                      {noches} {noches === 1 ? "noche" : "noches"}
+                    </span>
+                  </div>
+                  <div className="text-end">
+                    <small className="text-white-50 d-block text-uppercase" style={{ fontSize: "0.7rem" }}>
+                      Monto Total
+                    </small>
+                    <span className="fs-5 fw-bold" style={{ color: "#fbbf24" }}>
+                      {formatoMoneda(montoTotal)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-window-footer">
+                <button
+                  type="button"
+                  className="btn-luxury-outline"
+                  onClick={() => setModalFormAbierto(false)}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" disabled={guardando} className="btn-luxury-primary">
+                  {guardando
+                    ? "Guardando..."
+                    : editandoId
+                      ? "Actualizar Reservación"
+                      : "Guardar Reservación"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 2: PASARELA DE PAGO SIMULADO (HUÉSPED)
+         ========================================================================= */}
+      {reservacionAPagar && (
+        <div className="modal-backdrop-custom" onClick={() => setReservacionAPagar(null)}>
+          <div
+            className="modal-window"
+            style={{ maxWidth: "480px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-window-header">
+              <div>
+                <h6 className="fw-bold mb-0">Pasarela de Pago Seguro</h6>
+                <small className="text-muted">
+                  Folio {reservacionAPagar.folio || `#${reservacionAPagar.id_reservacion}`}
+                </small>
+              </div>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setReservacionAPagar(null)}
+              ></button>
+            </div>
+
+            <form onSubmit={manejarPagoSimulado}>
+              <div className="modal-window-body">
+                {/* Desglose de cobro */}
+                <div className="p-3 bg-light rounded-3 border mb-3">
+                  <div className="d-flex justify-content-between mb-1">
+                    <span className="text-muted small">Habitación:</span>
+                    <strong className="small">
+                      #{reservacionAPagar.habitacion?.numero} ({reservacionAPagar.habitacion?.tipoHabitacion?.nombre})
+                    </strong>
+                  </div>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span className="text-muted small">Estancia:</span>
+                    <strong className="small">
+                      {reservacionAPagar.fecha_entrada} al {reservacionAPagar.fecha_salida}
+                    </strong>
+                  </div>
+                  <div className="d-flex justify-content-between pt-2 mt-2 border-top">
+                    <span className="fw-semibold">Total a pagar:</span>
+                    <span className="fw-bold fs-6" style={{ color: "#065f46" }}>
+                      {formatoMoneda(Number(reservacionAPagar.total || 0))}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="input-label">Titular de la Tarjeta</label>
+                  <div className="login-input-wrap">
+                    <i className="bi bi-person login-input-icon"></i>
+                    <input
+                      type="text"
+                      required
+                      className="input-luxury"
+                      defaultValue={reservacionAPagar.nombre_cliente}
+                      placeholder="Nombre como aparece en la tarjeta"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="input-label">Número de Tarjeta</label>
+                  <div className="login-input-wrap">
+                    <i className="bi bi-credit-card login-input-icon"></i>
+                    <input
+                      type="text"
+                      required
+                      maxLength={19}
+                      className="input-luxury"
+                      placeholder="4000 1234 5678 9010"
+                      value={numTarjeta}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 16);
+                        const conEspacios = val.match(/.{1,4}/g)?.join(" ") || val;
+                        setNumTarjeta(conEspacios);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="row g-3">
+                  <div className="col-6">
+                    <label className="input-label">Vencimiento</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={5}
+                      className="input-luxury text-center"
+                      placeholder="MM/AA"
+                      value={expiracion}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        if (val.length >= 3) {
+                          val = val.slice(0, 2) + "/" + val.slice(2);
+                        }
+                        setExpiracion(val);
+                      }}
+                    />
+                  </div>
+                  <div className="col-6">
+                    <label className="input-label">CVV</label>
+                    <input
+                      type="password"
+                      required
+                      maxLength={4}
+                      className="input-luxury text-center"
+                      placeholder="•••"
+                      value={cvv}
+                      onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    />
+                  </div>
+                </div>
+
+                <small className="text-muted d-block text-center mt-3" style={{ fontSize: "0.75rem" }}>
+                  <i className="bi bi-shield-lock-fill text-success me-1"></i>
+                  Transacción protegida con cifrado simulado de 256 bits.
+                </small>
+              </div>
+
+              <div className="modal-window-footer">
+                <button
+                  type="button"
+                  className="btn-luxury-outline"
+                  onClick={() => setReservacionAPagar(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesandoPago}
+                  className="btn-luxury-primary"
+                >
+                  <i className="bi bi-check2-circle"></i>
+                  <span>
+                    {procesandoPago
+                      ? "Procesando pago..."
+                      : `Pagar ${formatoMoneda(Number(reservacionAPagar.total || 0))}`}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 3: CONFIRMACIÓN PARA ELIMINAR (ADMIN)
+         ========================================================================= */}
       {reservacionAEliminar && (
-        <div
-          className="modal-backdrop-custom"
-          onClick={() => setReservacionAEliminar(null)}
-        >
+        <div className="modal-backdrop-custom" onClick={() => setReservacionAEliminar(null)}>
           <div
             className="modal-window"
             style={{ maxWidth: 440 }}
@@ -1063,10 +1185,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
               <p className="text-muted small mb-0">
                 Se dará de baja la reservación de{" "}
                 <strong>{reservacionAEliminar.nombre_cliente}</strong> en{" "}
-                <strong>
-                  {reservacionAEliminar.habitacion?.hotel?.nombre || "el hotel"}
-                </strong>
-                .
+                <strong>{reservacionAEliminar.habitacion?.hotel?.nombre || "el hotel"}</strong>.
               </p>
             </div>
             <div className="modal-window-footer justify-content-center">
