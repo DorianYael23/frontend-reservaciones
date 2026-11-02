@@ -1,20 +1,13 @@
 import React, { useState } from "react";
+import type { SesionUsuario } from "../types";
+import { authLogin, authRegistro, authVerificarCodigo } from "../services/api";
 
-export interface SesionUsuario {
-  token: string;
-  id_usuario: number;
-  nombre: string;
-  email: string;
-  rol: "ADMIN" | "HUESPED";
-}
-
-export const SesionUsuario = {};
+// Reexportamos para mantener compatibilidad con componentes que importen SesionUsuario desde aquí
+export type { SesionUsuario };
 
 interface LoginViewProps {
   onLoginSuccess: (sesion: SesionUsuario) => void;
 }
-
-const API_AUTH = "http://localhost:8082/api/auth";
 
 type Modo = "login" | "registro" | "verificar";
 
@@ -69,7 +62,6 @@ const ICONO_ALERTA = {
   danger: "bi-exclamation-circle-fill",
 } as const;
 
-/* Campo de formulario con ícono a la izquierda y espacio opcional a la derecha */
 const Campo: React.FC<{
   id: string;
   label: string;
@@ -117,91 +109,45 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
     try {
       if (modo === "login") {
-        const res = await fetch(`${API_AUTH}/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email.trim(), password }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          setAlerta({
-            tipo: res.status === 403 ? "warning" : "danger",
-            texto: data.mensaje || "No se pudo iniciar sesión.",
-          });
-          if (res.status === 403) {
-            setModo("verificar");
-          }
-          return;
-        }
-
-        onLoginSuccess({
-          token: data.token,
-          id_usuario: data.id_usuario,
-          nombre: data.nombre,
-          email: data.email,
-          rol: data.rol,
-        });
+        const sesion = await authLogin({ email: email.trim(), password });
+        onLoginSuccess(sesion);
       } else if (modo === "registro") {
-        const res = await fetch(`${API_AUTH}/registro`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nombre: nombre.trim(),
-            email: email.trim(),
-            password,
-          }),
+        const data = await authRegistro({
+          nombre: nombre.trim(),
+          email: email.trim(),
+          password,
         });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          setAlerta({
-            tipo: "danger",
-            texto: data.mensaje || "No se pudo completar el registro.",
-          });
-          return;
-        }
-
         setAlerta({
           tipo: "success",
-          texto: data.mensaje,
+          texto: data.mensaje || "Registro exitoso.",
         });
         setPassword("");
         setModo("verificar");
       } else if (modo === "verificar") {
-        const res = await fetch(`${API_AUTH}/verificar-codigo`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: email.trim(),
-            codigo: codigo.trim(),
-          }),
+        const data = await authVerificarCodigo({
+          email: email.trim(),
+          codigo: codigo.trim(),
         });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          setAlerta({
-            tipo: "danger",
-            texto: data.mensaje || "Código de verificación inválido.",
-          });
-          return;
-        }
-
         setAlerta({
           tipo: "success",
-          texto: data.mensaje,
+          texto: data.mensaje || "Cuenta activada con éxito.",
         });
         setCodigo("");
         setModo("login");
       }
-    } catch {
+    } catch (err: any) {
+      const msg = err?.mensaje || "Error al conectar con el servidor.";
+      const esNoVerificado =
+        msg.toLowerCase().includes("verific") || msg.toLowerCase().includes("activ");
+
       setAlerta({
-        tipo: "danger",
-        texto: "Error al conectar con el servidor.",
+        tipo: modo === "login" && esNoVerificado ? "warning" : "danger",
+        texto: msg,
       });
+
+      if (modo === "login" && esNoVerificado) {
+        setModo("verificar");
+      }
     } finally {
       setLoading(false);
     }
@@ -211,7 +157,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="login-page">
-      {/* ======================= Panel de marca ======================= */}
+      {/* Panel de marca */}
       <aside className="login-brand">
         <div className="login-brand-inner">
           <div className="login-brand-top">
@@ -257,12 +203,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
       </aside>
 
-      {/* ======================= Formulario ======================= */}
+      {/* Formulario */}
       <main className="login-main">
         <div className="login-card">
           <div className="login-body">
             <header className="login-head">
-              {/* Emblema superior contextual */}
               <div className="login-head-badge-row">
                 <div className="login-head-icon">
                   <i className={`bi ${textos.icono}`} aria-hidden="true"></i>
@@ -394,7 +339,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             </form>
           </div>
 
-          {/* Pie de acciones rediseñado */}
           <div className="login-switch">
             {modo === "login" ? (
               <>

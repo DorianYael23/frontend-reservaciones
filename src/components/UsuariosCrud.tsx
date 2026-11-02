@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from "react";
-
-interface Usuario {
-  id_usuario: number;
-  nombre: string;
-  email: string;
-  rol: "ADMIN" | "HUESPED";
-  verificado: boolean;
-  fecha_registro: string;
-}
-
-const API_USUARIOS = "http://localhost:8082/api/usuarios";
+import type { Usuario } from "../types";
+import {
+  obtenerUsuarios,
+  crearUsuario,
+  actualizarUsuario,
+  eliminarUsuario,
+} from "../services/api";
 
 export const UsuariosCrud: React.FC = () => {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados de notificaciones y errores (alineados con TiposCrud)
+  // Estados de notificaciones y errores
   const [exito, setExito] = useState<string | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [errorModal, setErrorModal] = useState<string | null>(null);
@@ -38,14 +34,10 @@ export const UsuariosCrud: React.FC = () => {
   const cargarUsuarios = async () => {
     setLoading(true);
     try {
-      const res = await fetch(API_USUARIOS);
-      if (res.ok) {
-        setUsuarios(await res.json());
-      } else {
-        setErrorBanner("No se pudo cargar la lista de usuarios.");
-      }
+      const data = await obtenerUsuarios();
+      setUsuarios(data);
     } catch {
-      setErrorBanner("Error de conexión al cargar la lista de usuarios.");
+      setErrorBanner("Error al cargar la lista de usuarios.");
     } finally {
       setLoading(false);
     }
@@ -55,7 +47,6 @@ export const UsuariosCrud: React.FC = () => {
     cargarUsuarios();
   }, []);
 
-  // Auto-cierre de notificaciones flotantes a los 3.5 segundos
   useEffect(() => {
     if (exito || errorBanner) {
       const timer = setTimeout(() => {
@@ -79,13 +70,13 @@ export const UsuariosCrud: React.FC = () => {
   };
 
   const abrirEditar = (u: Usuario) => {
-    setEditandoId(u.id_usuario);
+    setEditandoId(u.id_usuario!);
     setNombre(u.nombre);
     setEmail(u.email);
     setPassword("");
     setMostrarPassword(false);
-    setRol(u.rol);
-    setVerificado(u.verificado);
+    setRol(u.rol as "ADMIN" | "HUESPED");
+    setVerificado(!!u.verificado);
     setErrorModal(null);
     setMostrarModal(true);
   };
@@ -95,57 +86,47 @@ export const UsuariosCrud: React.FC = () => {
     setErrorModal(null);
     setGuardando(true);
 
-    const url = editandoId ? `${API_USUARIOS}/${editandoId}` : API_USUARIOS;
-    const metodo = editandoId ? "PUT" : "POST";
+    const payload: Partial<Usuario> = {
+      nombre,
+      email,
+      password: password || undefined,
+      rol,
+      verificado,
+    };
 
     try {
-      const res = await fetch(url, {
-        method: metodo,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, email, password, rol, verificado }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setErrorModal(data.mensaje || "Error al guardar los datos del usuario.");
-        return;
-      }
+      const data = editandoId
+        ? await actualizarUsuario(editandoId, payload)
+        : await crearUsuario(payload);
 
       setExito(data.mensaje || (editandoId ? "Usuario actualizado." : "Usuario registrado."));
       setMostrarModal(false);
       cargarUsuarios();
-    } catch {
-      setErrorModal("Error de conexión con el servidor.");
+    } catch (err: any) {
+      setErrorModal(err?.mensaje || "Error al guardar los datos del usuario.");
     } finally {
       setGuardando(false);
     }
   };
 
   const confirmarEliminarUsuario = async () => {
-    if (!usuarioAEliminar) return;
+    if (!usuarioAEliminar?.id_usuario) return;
     const id = usuarioAEliminar.id_usuario;
     setErrorBanner(null);
 
     try {
-      const res = await fetch(`${API_USUARIOS}/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (res.ok) {
-        setExito(data.mensaje || "Usuario eliminado correctamente.");
-        setUsuarioAEliminar(null);
-        cargarUsuarios();
-      } else {
-        setErrorBanner(data.mensaje || "No se pudo eliminar el usuario.");
-        setUsuarioAEliminar(null);
-      }
-    } catch {
-      setErrorBanner("Error de conexión al eliminar el usuario.");
+      const data = await eliminarUsuario(id);
+      setExito(data.mensaje || "Usuario eliminado correctamente.");
+      setUsuarioAEliminar(null);
+      cargarUsuarios();
+    } catch (err: any) {
+      setErrorBanner(err?.mensaje || "No se pudo eliminar el usuario.");
       setUsuarioAEliminar(null);
     }
   };
 
   return (
     <div>
-      {/* NOTIFICACIONES FLOTANTES */}
       {exito && (
         <div className="toast-alert alert alert-success border-0 rounded-4 shadow-sm d-flex justify-content-between align-items-center mb-4">
           <div>
@@ -165,7 +146,6 @@ export const UsuariosCrud: React.FC = () => {
         </div>
       )}
 
-      {/* TARJETA PRINCIPAL */}
       <div className="luxury-card">
         <div className="luxury-card-header">
           <div>
@@ -242,7 +222,13 @@ export const UsuariosCrud: React.FC = () => {
                       {u.fecha_registro}
                     </td>
                     <td className="text-end">
-
+                      <button
+                        className="action-icon-btn me-1"
+                        title="Detalle"
+                        onClick={() => setUsuarioDetalle(u)}
+                      >
+                        <i className="bi bi-eye"></i>
+                      </button>
                       <button
                         className="action-icon-btn me-1"
                         title="Editar"
@@ -266,7 +252,6 @@ export const UsuariosCrud: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL PARA CREAR / EDITAR USUARIO */}
       {mostrarModal && (
         <div className="modal-backdrop-custom" onClick={() => setMostrarModal(false)}>
           <div className="modal-window" onClick={(e) => e.stopPropagation()}>
@@ -290,7 +275,6 @@ export const UsuariosCrud: React.FC = () => {
                   </div>
                 )}
 
-                {/* Nombre completo */}
                 <div className="mb-3">
                   <label className="input-label">
                     Nombre Completo <span className="login-req">*</span>
@@ -308,7 +292,6 @@ export const UsuariosCrud: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Correo electrónico */}
                 <div className="mb-3">
                   <label className="input-label">
                     Correo Electrónico <span className="login-req">*</span>
@@ -337,7 +320,6 @@ export const UsuariosCrud: React.FC = () => {
                   )}
                 </div>
 
-                {/* Contraseña con botón de mostrar/ocultar */}
                 <div className="mb-3">
                   <label className="input-label">
                     {editandoId ? "Nueva Contraseña (Opcional)" : "Contraseña"}{" "}
@@ -367,7 +349,6 @@ export const UsuariosCrud: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Selectores segmentados para Rol y Estado */}
                 <div className="row g-3">
                   <div className="col-md-6">
                     <label className="input-label">Rol de Acceso</label>
@@ -436,7 +417,7 @@ export const UsuariosCrud: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DETALLE */}
+      {/* MODAL DETALLE DE USUARIO */}
       {usuarioDetalle && (
         <div className="modal-backdrop-custom" onClick={() => setUsuarioDetalle(null)}>
           <div className="modal-window" onClick={(e) => e.stopPropagation()}>
@@ -445,6 +426,7 @@ export const UsuariosCrud: React.FC = () => {
                 Ficha de Usuario #{usuarioDetalle.id_usuario}
               </h6>
               <button
+                type="button"
                 className="btn-close"
                 onClick={() => setUsuarioDetalle(null)}
               ></button>
@@ -479,12 +461,13 @@ export const UsuariosCrud: React.FC = () => {
                 </div>
                 <div className="text-end">
                   <small className="text-muted d-block">Fecha de Registro</small>
-                  <strong>{usuarioDetalle.fecha_registro}</strong>
+                  <strong>{usuarioDetalle.fecha_registro || "Reciente"}</strong>
                 </div>
               </div>
             </div>
             <div className="modal-window-footer">
               <button
+                type="button"
                 className="btn-luxury-outline"
                 onClick={() => setUsuarioDetalle(null)}
               >
