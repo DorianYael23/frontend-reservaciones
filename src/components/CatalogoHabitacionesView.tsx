@@ -1,50 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { type SesionUsuario } from "./LoginView";
-
-interface Hotel {
-    id_hotel: number;
-    nombre: string;
-    ciudad: string;
-    imagen_url?: string;
-    descripcion?: string;
-}
-
-interface TipoHabitacion {
-    id_tipo: number;
-    nombre: string;
-    capacidad: number;
-    descripcion?: string;
-    precio_base: number;
-    imagen_url?: string;
-}
-
-interface Habitacion {
-    id_habitacion: number;
-    numero: string;
-    piso: number;
-    estado: string;
-    imagen_url?: string;
-    hotel: Hotel;
-    tipoHabitacion: TipoHabitacion;
-}
-
-interface OcupacionFecha {
-    id_reservacion: number;
-    id_habitacion: number;
-    fecha_entrada: string;
-    fecha_salida: string;
-    estado: string;
-}
+import type {
+    Hotel,
+    TipoHabitacion,
+    Habitacion,
+    OcupacionFecha,
+    SesionUsuario,
+    ReservacionPayload,
+} from "../types";
+import {
+    obtenerHabitaciones,
+    obtenerHoteles,
+    obtenerTipos,
+    obtenerOcupacionFechas,
+    crearReservacion,
+} from "../services/api";
 
 interface CatalogoProps {
     sesion: SesionUsuario;
     onReservacionExitosa?: () => void;
 }
-
-const API_HABITACIONES = "http://localhost:8082/api/habitaciones";
-const API_HOTELES = "http://localhost:8082/api/hoteles";
-const API_TIPOS = "http://localhost:8082/api/tipos-habitacion";
-const API_RESERVACIONES = "http://localhost:8082/api/reservaciones";
 
 const FOTOS_POR_TIPO: Record<string, string> = {
     suite: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80",
@@ -69,7 +43,10 @@ const obtenerFechaLocalIso = (diasSumar = 0, fechaBase?: string): string => {
     return `${year}-${month}-${day}`;
 };
 
-export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onReservacionExitosa }) => {
+export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
+    sesion,
+    onReservacionExitosa,
+}) => {
     const hoyIso = obtenerFechaLocalIso(0);
 
     const [hoteles, setHoteles] = useState<Hotel[]>([]);
@@ -78,15 +55,11 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
     const [ocupacion, setOcupacion] = useState<OcupacionFecha[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Hotel seleccionado para el paso 2 (null = vista de bienvenida con los 2 hoteles)
     const [hotelSeleccionado, setHotelSeleccionado] = useState<Hotel | null>(null);
-
-    // Filtros de estancia
     const [fechaEntrada, setFechaEntrada] = useState(hoyIso);
     const [fechaSalida, setFechaSalida] = useState(obtenerFechaLocalIso(1, hoyIso));
     const [filtroTipo, setFiltroTipo] = useState<number | "">("");
 
-    // Modal de reserva
     const [habitacionParaReservar, setHabitacionParaReservar] = useState<Habitacion | null>(null);
     const [telefono, setTelefono] = useState("");
     const [numHuespedes, setNumHuespedes] = useState(1);
@@ -101,17 +74,17 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
         setLoading(true);
         try {
             const [resHabs, resHoteles, resTipos, resOcupacion] = await Promise.all([
-                fetch(API_HABITACIONES),
-                fetch(API_HOTELES),
-                fetch(API_TIPOS),
-                fetch(`${API_RESERVACIONES}/ocupacion-fechas`),
+                obtenerHabitaciones(),
+                obtenerHoteles(),
+                obtenerTipos(),
+                obtenerOcupacionFechas(),
             ]);
-            if (resHabs.ok) setHabitaciones(await resHabs.json());
-            if (resHoteles.ok) setHoteles(await resHoteles.json());
-            if (resTipos.ok) setTipos(await resTipos.json());
-            if (resOcupacion.ok) setOcupacion(await resOcupacion.json());
+            setHabitaciones(resHabs);
+            setHoteles(resHoteles);
+            setTipos(resTipos);
+            setOcupacion(resOcupacion);
         } catch {
-            // Manejo silencioso de red
+            // Manejo silencioso
         } finally {
             setLoading(false);
         }
@@ -141,7 +114,9 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
 
     const habitacionesVisibles = habitaciones.filter((h) => {
         if (h.estado === "Mantenimiento") return false;
-        if (hotelSeleccionado && h.hotel?.id_hotel !== hotelSeleccionado.id_hotel) return false;
+        if (hotelSeleccionado && hotelSeleccionado.id_hotel !== 0 && h.hotel?.id_hotel !== hotelSeleccionado.id_hotel) {
+            return false;
+        }
         if (filtroTipo && h.tipoHabitacion?.id_tipo !== Number(filtroTipo)) return false;
         return true;
     });
@@ -158,11 +133,11 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
 
     const confirmarReservacion = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!habitacionParaReservar) return;
+        if (!habitacionParaReservar?.id_habitacion) return;
         setGuardando(true);
         setErrorModal(null);
 
-        const payload = {
+        const payload: ReservacionPayload = {
             habitacion: { id_habitacion: habitacionParaReservar.id_habitacion },
             nombre_cliente: sesion.nombre,
             telefono: telefono.trim(),
@@ -174,23 +149,17 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
         };
 
         try {
-            const res = await fetch(API_RESERVACIONES, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                setErrorModal(data.mensaje || "No se pudo crear la reservación.");
-                return;
-            }
-
+            await crearReservacion(payload);
             setHabitacionParaReservar(null);
-            setExitoToast("¡Reservación confirmada exitosamente!");
-            cargarDatos();
-            if (onReservacionExitosa) onReservacionExitosa();
-        } catch {
-            setErrorModal("Error de conexión al procesar la reserva.");
+            setExitoToast("¡Reservación exito! Redirigiendo a reservaciones ");
+
+            // Damos 1.5 segundos para que lea la notificación antes de cambiar de vista
+            setTimeout(() => {
+                if (onReservacionExitosa) onReservacionExitosa();
+            }, 1500);
+
+        } catch (err: any) {
+            setErrorModal(err?.mensaje || "Error al procesar la reserva.");
         } finally {
             setGuardando(false);
         }
@@ -210,9 +179,6 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
                 </div>
             )}
 
-            {/* =========================================================================
-          PASO 1: SELECCIÓN DE HOTEL (SI AÚN NO HA ELEGIDO UNO)
-         ========================================================================= */}
             {!hotelSeleccionado && (
                 <div>
                     <div className="d-flex justify-content-between align-items-center mb-4">
@@ -240,7 +206,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
                         {hoteles.map((hotel) => {
                             const fotoHotel =
                                 hotel.imagen_url ||
-                                FOTOS_HOTELES_DEFAULT[hotel.id_hotel] ||
+                                (hotel.id_hotel ? FOTOS_HOTELES_DEFAULT[hotel.id_hotel] : undefined) ||
                                 FOTOS_HOTELES_DEFAULT[1];
                             const totalHabitaciones = habitaciones.filter(
                                 (h) => h.hotel?.id_hotel === hotel.id_hotel
@@ -301,13 +267,8 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
                 </div>
             )}
 
-            {/* =========================================================================
-          PASO 2: HABITACIONES DEL HOTEL SELECCIONADO (CON FILTROS Y RESERVA)
-         ========================================================================= */}
             {hotelSeleccionado && (
                 <div>
-                    {/* Barra de cabecera con botón para volver a elegir hotel */}
-                    {/* Barra de cabecera con botón de cambiar hotel alineado a la derecha */}
                     <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
                         <div>
                             <h4 className="fw-bold mb-1">
@@ -341,7 +302,6 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
                         </div>
                     </div>
 
-                    {/* Filtros de fechas y tipo */}
                     <div className="luxury-card mb-4">
                         <div className="p-3 bg-light">
                             <div className="row g-2 align-items-end">
@@ -391,7 +351,6 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
                         </div>
                     </div>
 
-                    {/* Listado de tarjetas de habitaciones */}
                     {loading ? (
                         <div className="text-center py-5 text-muted">
                             <div className="spinner-border text-warning mb-2" role="status" />
@@ -406,7 +365,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
                     ) : (
                         <div className="row g-4">
                             {habitacionesVisibles.map((hab) => {
-                                const ocupada = estaOcupadaEnFechas(hab.id_habitacion);
+                                const ocupada = hab.id_habitacion ? estaOcupadaEnFechas(hab.id_habitacion) : false;
                                 const imagen = resolverFotoHabitacion(hab);
 
                                 return (
@@ -499,9 +458,6 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({ sesion, onRe
                 </div>
             )}
 
-            {/* =========================================================================
-          MODAL DE CONFIRMACIÓN DE RESERVACIÓN
-         ========================================================================= */}
             {habitacionParaReservar && (
                 <div className="modal-backdrop-custom" onClick={() => setHabitacionParaReservar(null)}>
                     <div className="modal-window" onClick={(e) => e.stopPropagation()}>

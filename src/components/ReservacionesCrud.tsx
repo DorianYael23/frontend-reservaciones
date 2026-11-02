@@ -543,6 +543,41 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       </div>
 
+      {/* AVISO EXCLUSIVO PARA EL HUÉSPED */}
+      {!esAdmin && (
+        <div
+          className="alert border-0 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between p-3"
+          style={{
+            backgroundColor: "#ffffff",
+            borderLeft: "4px solid #f59e0b",
+          }}
+        >
+          <div className="d-flex align-items-center gap-3">
+            <div
+              className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+              style={{
+                width: "40px",
+                height: "40px",
+                backgroundColor: "#fffbeb",
+                color: "#d97706",
+              }}
+            >
+              <i className="bi bi-stars fs-5"></i>
+            </div>
+            <div>
+              <div className="fw-bold small text-dark">
+                ¿Deseas modificar fechas o cancelar una estancia?
+              </div>
+              <div className="text-muted small" style={{ fontSize: "0.82rem" }}>
+                Por políticas del sistema, las cancelaciones y cambios de habitación o fecha se
+                gestionan de forma segura indicando tu <strong>código de Folio</strong> en el{" "}
+                <strong>Asistente IA</strong>.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TABLA PRINCIPAL */}
       <div className="luxury-card">
         <div className="luxury-card-header">
@@ -555,7 +590,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
             <p className="text-muted small mb-0">
               {esAdmin
                 ? "Gestiona todas las reservaciones, confirmaciones de pago y Check-in en recepción."
-                : "Historial de reservaciones realizadas. Puedes pagar en línea las que estén pendientes."}
+                : "Historial de reservaciones. Paga en línea las pendientes o solicita modificaciones y cancelaciones desde el Asistente IA."}
             </p>
           </div>
 
@@ -663,8 +698,8 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                       <td>{renderBadgeEstado(res.estado)}</td>
                       <td className="text-end">
                         {!esAdmin ? (
-                          <div className="d-inline-flex align-items-center gap-1">
-                            {res.estado === "Pendiente" ? (
+                          <div className="d-inline-flex align-items-center gap-2">
+                            {res.estado === "Pendiente" && (
                               <button
                                 type="button"
                                 onClick={() => setReservacionAPagar(res)}
@@ -674,27 +709,22 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                                 <i className="bi bi-credit-card"></i>
                                 <span>Pagar</span>
                               </button>
-                            ) : res.estado === "Confirmada" ||
-                              res.estado === "En Curso" ||
-                              res.estado === "Finalizada" ? (
-                              <button
-                                type="button"
-                                disabled
-                                className="btn-luxury-outline py-1 px-3 small opacity-50"
-                                style={{ cursor: "not-allowed" }}
+                            )}
+
+                            {/* Badge aclaratorio para modificaciones con IA */}
+                            {res.estado !== "Cancelada" && res.estado !== "Finalizada" && (
+                              <span
+                                className="badge-soft badge-stone"
+                                style={{ cursor: "help", fontSize: "0.72rem" }}
+                                title={`Para cancelar o reprogramar la reservación ${res.folio || "#" + res.id_reservacion}, indícale este folio a nuestro Asistente IA.`}
                               >
-                                <i className="bi bi-lock-fill me-1"></i>
-                                Confirmada
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled
-                                className="btn-luxury-outline py-1 px-3 small opacity-50"
-                                style={{ cursor: "not-allowed" }}
-                              >
-                                Cancelada
-                              </button>
+                                <i className="bi bi-stars text-warning me-1"></i>
+                                Cambios con IA
+                              </span>
+                            )}
+
+                            {res.estado === "Cancelada" && (
+                              <span className="text-muted small opacity-50">Cancelada</span>
                             )}
                           </div>
                         ) : (
