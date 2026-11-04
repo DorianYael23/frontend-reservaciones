@@ -89,7 +89,7 @@ const MODULOS: Modulo[] = [
     titulo: 'Explorar Estancias',
     descripcion: 'Fotos, tarifas y reservas directas',
     icono: 'bi-compass-fill',
-    rolesPermitidos: ['ADMIN', 'HUESPED'],
+    rolesPermitidos: ['HUESPED'],
   },
   {
     id: 'reservaciones',
