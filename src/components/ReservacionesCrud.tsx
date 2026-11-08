@@ -53,9 +53,12 @@ interface ReservacionesCrudProps {
   sesion?: SesionUsuario | null;
 }
 
-const API_RESERVACIONES = "http://localhost:8082/api/reservaciones";
-const API_HABITACIONES = "http://localhost:8082/api/habitaciones";
-const API_TIPOS = "http://localhost:8082/api/tipos-habitacion";
+const hostActual = typeof window !== "undefined" ? window.location.hostname : "localhost";
+const API_BASE = (import.meta as any).env?.VITE_API_URL || `http://${hostActual}:8082/api`;
+
+const API_RESERVACIONES = `${API_BASE}/reservaciones`;
+const API_HABITACIONES = `${API_BASE}/habitaciones`;
+const API_TIPOS = `${API_BASE}/tipos-habitacion`;
 
 const obtenerFechaLocalIso = (diasSumar = 0, fechaBase?: string): string => {
   const base = fechaBase ? new Date(fechaBase + "T00:00:00") : new Date();
@@ -107,6 +110,11 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
 
   const formatoMoneda = (valor: number) =>
     new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(valor || 0);
+
+  const copiarFolio = (folioTexto: string) => {
+    navigator.clipboard?.writeText(folioTexto);
+    setExito(`Folio ${folioTexto} copiado para usar en el Asistente IA.`);
+  };
 
   const cargarDatos = async () => {
     setLoading(true);
@@ -498,45 +506,45 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       )}
 
-      {/* STRIP DE KPIS */}
-      <div className="row g-3 mb-4">
-        <div className="col-12 col-md-4">
-          <div className="stat-box d-flex justify-content-between align-items-center shadow-sm">
+      {/* STRIP DE KPIS (Compacto en 3 columnas en móvil, normal en PC) */}
+      <div className="row g-2 g-md-3 mb-3 mb-md-4">
+        <div className="col-4 col-md-4">
+          <div className="stat-box d-flex justify-content-between align-items-center shadow-sm p-2 p-md-3 h-100">
             <div>
-              <div className="text-muted small fw-medium">
-                {esAdmin ? "Reservaciones por Llegar" : "Mis Próximas Estancias"}
+              <div className="text-muted small fw-medium" style={{ fontSize: "0.75rem" }}>
+                {esAdmin ? "Por Llegar" : "Próximas"}
               </div>
-              <h3 className="fw-bold mb-0 mt-1">{totalPendientesConfirmadas}</h3>
+              <h4 className="fw-bold mb-0 mt-1">{totalPendientesConfirmadas}</h4>
             </div>
-            <div className="brand-badge">
+            <div className="brand-badge d-none d-sm-flex">
               <i className="bi bi-journal-bookmark"></i>
             </div>
           </div>
         </div>
 
-        <div className="col-12 col-md-4">
-          <div className="stat-box d-flex justify-content-between align-items-center shadow-sm">
+        <div className="col-4 col-md-4">
+          <div className="stat-box d-flex justify-content-between align-items-center shadow-sm p-2 p-md-3 h-100">
             <div>
-              <div className="text-muted small fw-medium">
-                {esAdmin ? "Check-In Activos (Ocupadas)" : "Mis Estancias En Curso"}
+              <div className="text-muted small fw-medium" style={{ fontSize: "0.75rem" }}>
+                {esAdmin ? "Activos" : "En Curso"}
               </div>
-              <h3 className="fw-bold mb-0 mt-1">{totalEnCurso}</h3>
+              <h4 className="fw-bold mb-0 mt-1">{totalEnCurso}</h4>
             </div>
-            <div className="brand-badge">
+            <div className="brand-badge d-none d-sm-flex">
               <i className="bi bi-door-closed"></i>
             </div>
           </div>
         </div>
 
-        <div className="col-12 col-md-4">
-          <div className="stat-box d-flex justify-content-between align-items-center shadow-sm">
+        <div className="col-4 col-md-4">
+          <div className="stat-box d-flex justify-content-between align-items-center shadow-sm p-2 p-md-3 h-100">
             <div>
-              <div className="text-muted small fw-medium">
-                {esAdmin ? "Total de Reservaciones" : "Total de Mis Reservaciones"}
+              <div className="text-muted small fw-medium" style={{ fontSize: "0.75rem" }}>
+                Total
               </div>
-              <h3 className="fw-bold mb-0 mt-1">{reservaciones.length}</h3>
+              <h4 className="fw-bold mb-0 mt-1">{reservaciones.length}</h4>
             </div>
-            <div className="brand-badge">
+            <div className="brand-badge d-none d-sm-flex">
               <i className="bi bi-calendar2-week"></i>
             </div>
           </div>
@@ -546,18 +554,18 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
       {/* AVISO EXCLUSIVO PARA EL HUÉSPED */}
       {!esAdmin && (
         <div
-          className="alert border-0 rounded-4 shadow-sm mb-4 d-flex align-items-center justify-content-between p-3"
+          className="alert border-0 rounded-4 shadow-sm mb-3 mb-md-4 d-flex align-items-center justify-content-between p-2 p-md-3"
           style={{
             backgroundColor: "#ffffff",
             borderLeft: "4px solid #f59e0b",
           }}
         >
-          <div className="d-flex align-items-center gap-3">
+          <div className="d-flex align-items-center gap-2 gap-md-3">
             <div
               className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
               style={{
-                width: "40px",
-                height: "40px",
+                width: "36px",
+                height: "36px",
                 backgroundColor: "#fffbeb",
                 color: "#d97706",
               }}
@@ -566,11 +574,10 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
             </div>
             <div>
               <div className="fw-bold small text-dark">
-                ¿Deseas modificar fechas o cancelar una estancia?
+                ¿Cambiar fechas o cancelar?
               </div>
-              <div className="text-muted small" style={{ fontSize: "0.82rem" }}>
-                Por políticas del sistema, las cancelaciones y cambios de habitación o fecha se
-                gestionan de forma segura indicando tu <strong>código de Folio</strong> en el{" "}
+              <div className="text-muted small" style={{ fontSize: "0.78rem" }}>
+                Toca tu <strong>código de Folio</strong> para copiarlo y envíalo en el{" "}
                 <strong>Asistente IA</strong>.
               </div>
             </div>
@@ -578,7 +585,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       )}
 
-      {/* TABLA PRINCIPAL */}
+      {/* CONTENEDOR PRINCIPAL */}
       <div className="luxury-card">
         <div className="luxury-card-header">
           <div>
@@ -587,7 +594,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                 ? "Control General de Reservaciones"
                 : `Mis Reservaciones (${sesion?.nombre})`}
             </h5>
-            <p className="text-muted small mb-0">
+            <p className="text-muted small mb-0 d-none d-md-block">
               {esAdmin
                 ? "Gestiona todas las reservaciones, confirmaciones de pago y Check-in en recepción."
                 : "Historial de reservaciones. Paga en línea las pendientes o solicita modificaciones y cancelaciones desde el Asistente IA."}
@@ -599,7 +606,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
               type="button"
               onClick={cargarDatos}
               className="btn-luxury-outline"
-              title="Actualizar tabla"
+              title="Actualizar"
             >
               <i className="bi bi-arrow-clockwise"></i>
             </button>
@@ -610,13 +617,184 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                 className="btn-luxury-primary"
               >
                 <i className="bi bi-plus-lg"></i>
-                <span>Nueva Reservación</span>
+                <span className="d-none d-sm-inline">Nueva Reservación</span>
               </button>
             )}
           </div>
         </div>
 
-        <div className="table-responsive">
+        {/* =====================================================================
+            VISTA DE CELULAR (< 768px): TARJETAS LIGERAS SIN TABLA PESADA
+           ===================================================================== */}
+        <div className="d-md-none p-2">
+          {loading ? (
+            <div className="text-center py-4 text-muted small">
+              Cargando reservaciones...
+            </div>
+          ) : reservaciones.length === 0 ? (
+            <div className="text-center py-4 text-muted small">
+              No tienes reservaciones registradas actualmente.
+            </div>
+          ) : (
+            <div className="d-flex flex-column gap-3">
+              {reservaciones.map((res) => {
+                const codigoFolio = res.folio || `R${10000 + (res.id_reservacion || 0)}`;
+                const puedeHacerCheckInHoy =
+                  res.estado === "Confirmada" && hoyIso >= res.fecha_entrada;
+
+                return (
+                  <div
+                    key={res.id_reservacion}
+                    className="rounded-4 p-3 shadow-sm"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e4e4e7",
+                    }}
+                  >
+                    {/* Fila 1: Folio (Click para copiar) + Estatus */}
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <button
+                        type="button"
+                        onClick={() => copiarFolio(codigoFolio)}
+                        className="btn btn-sm p-0 d-inline-flex align-items-center gap-1 fw-bold text-dark border-0"
+                        title="Toca para copiar el folio"
+                      >
+                        <span
+                          className="px-2 py-1 rounded-2"
+                          style={{ backgroundColor: "#f4f4f5", fontSize: "0.85rem" }}
+                        >
+                          #{codigoFolio} <i className="bi bi-copy ms-1 text-muted small"></i>
+                        </span>
+                      </button>
+                      {renderBadgeEstado(res.estado)}
+                    </div>
+
+                    {/* Fila 2: Habitación y Hotel */}
+                    <div className="mb-2">
+                      <div className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>
+                        Hab. #{res.habitacion?.numero} · {res.habitacion?.tipoHabitacion?.nombre}
+                      </div>
+                      <div className="text-muted small">
+                        <i className="bi bi-building me-1"></i>
+                        {res.habitacion?.hotel?.nombre} ({res.num_huespedes || 1}{" "}
+                        {res.num_huespedes === 1 ? "huésped" : "huéspedes"})
+                      </div>
+                      {esAdmin && (
+                        <div className="text-muted small mt-1">
+                          <i className="bi bi-person me-1"></i>
+                          {res.nombre_cliente} · {res.telefono}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Fila 3: Fechas en recuadro compacto */}
+                    <div
+                      className="rounded-3 p-2 mb-2 d-flex justify-content-between align-items-center small"
+                      style={{ backgroundColor: "#fafafa", border: "1px solid #f4f4f5" }}
+                    >
+                      <div>
+                        <span className="text-muted d-block" style={{ fontSize: "0.7rem" }}>
+                          ENTRADA
+                        </span>
+                        <strong>{res.fecha_entrada}</strong>
+                      </div>
+                      <i className="bi bi-arrow-right text-muted"></i>
+                      <div className="text-end">
+                        <span className="text-muted d-block" style={{ fontSize: "0.7rem" }}>
+                          SALIDA
+                        </span>
+                        <strong>{res.fecha_salida}</strong>
+                      </div>
+                    </div>
+
+                    {/* Fila 4: Total y Botón de Acción */}
+                    <div className="d-flex justify-content-between align-items-center pt-2 border-top">
+                      <div>
+                        <span className="text-muted d-block" style={{ fontSize: "0.7rem" }}>
+                          TOTAL
+                        </span>
+                        <span className="fw-bold fs-6" style={{ color: "#065f46" }}>
+                          {formatoMoneda(Number(res.total || 0))}
+                        </span>
+                      </div>
+
+                      {!esAdmin ? (
+                        <div className="d-flex align-items-center gap-2">
+                          {res.estado === "Pendiente" ? (
+                            <button
+                              type="button"
+                              onClick={() => setReservacionAPagar(res)}
+                              className="btn-luxury-primary py-1 px-3 small"
+                            >
+                              <i className="bi bi-credit-card"></i>
+                              <span>Pagar ahora</span>
+                            </button>
+                          ) : (
+                            res.estado !== "Cancelada" &&
+                            res.estado !== "Finalizada" && (
+                              <span
+                                className="badge-soft badge-stone"
+                                style={{ fontSize: "0.72rem" }}
+                                onClick={() => copiarFolio(codigoFolio)}
+                              >
+                                <i className="bi bi-stars text-warning me-1"></i>
+                                Cambios en IA
+                              </span>
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        <div className="d-flex align-items-center gap-1">
+                          {res.estado === "Confirmada" && (
+                            <button
+                              type="button"
+                              onClick={() => ejecutarCheckIn(res)}
+                              className={
+                                puedeHacerCheckInHoy
+                                  ? "btn-luxury-primary py-1 px-2 small"
+                                  : "btn-luxury-outline py-1 px-2 small opacity-75"
+                              }
+                            >
+                              Check-in
+                            </button>
+                          )}
+                          {res.estado === "En Curso" && (
+                            <button
+                              type="button"
+                              onClick={() => ejecutarCheckOut(res)}
+                              className="btn-luxury-primary py-1 px-2 small"
+                            >
+                              Check-out
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => abrirFormularioEditar(res)}
+                            className="action-icon-btn"
+                          >
+                            <i className="bi bi-pencil"></i>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReservacionAEliminar(res)}
+                            className="action-icon-btn delete"
+                          >
+                            <i className="bi bi-trash3"></i>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* =====================================================================
+            VISTA DE ESCRITORIO (>= 768px): TU TABLA ORIGINAL INTACTA
+           ===================================================================== */}
+        <div className="table-responsive d-none d-md-block">
           <table className="table-luxury">
             <thead>
               <tr>
@@ -711,7 +889,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                               </button>
                             )}
 
-                            {/* Badge aclaratorio para modificaciones con IA */}
                             {res.estado !== "Cancelada" && res.estado !== "Finalizada" && (
                               <span
                                 className="badge-soft badge-stone"

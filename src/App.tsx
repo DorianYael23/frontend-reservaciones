@@ -33,34 +33,38 @@ const STORAGE_SESION_KEY = 'paraiso_auth_sesion_v1';
 const win = window as any;
 if (!win.__fetchOriginalParaiso) {
   win.__fetchOriginalParaiso = window.fetch.bind(window);
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : (input as Request).url;
+}
 
-    if (url.startsWith('http://localhost:8082') && !url.includes('/api/auth/')) {
-      const guardada = localStorage.getItem(STORAGE_SESION_KEY);
-      if (guardada) {
-        try {
-          const sesion: SesionUsuario = JSON.parse(guardada);
-          if (sesion?.token) {
-            const headers = new Headers(init?.headers || {});
-            if (!headers.has('Authorization')) {
-              headers.set('Authorization', `Bearer ${sesion.token}`);
-            }
-            init = { ...init, headers };
+window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : (input as Request).url;
+
+  const esBackend = url.includes(':8082') || url.includes('/api/');
+  const esRutaAuth = url.includes('/api/auth/');
+
+  if (esBackend && !esRutaAuth) {
+    const guardada = localStorage.getItem(STORAGE_SESION_KEY);
+    if (guardada) {
+      try {
+        const sesion: SesionUsuario = JSON.parse(guardada);
+        if (sesion?.token) {
+          const headers = new Headers(init?.headers || {});
+          if (!headers.has('Authorization')) {
+            headers.set('Authorization', `Bearer ${sesion.token}`);
           }
-        } catch {
-          // Ignorar error de lectura
+          init = { ...init, headers };
         }
+      } catch {
+        // Ignorar error de lectura
       }
     }
-    return win.__fetchOriginalParaiso(input, init);
-  };
-}
+  }
+  return win.__fetchOriginalParaiso(input, init);
+};
 
 const MODULOS: Modulo[] = [
   {
@@ -164,24 +168,37 @@ function App() {
       {/* CABECERA FLOTANTE CON EFECTO CRISTAL */}
       <div className="exec-header-sticky">
         <header className="exec-topbar">
-          <div className="exec-container d-flex flex-wrap justify-content-between align-items-center">
-            <div className="d-flex align-items-center gap-3">
-              <div className="exec-logo">
+          <div className="exec-container d-flex flex-nowrap justify-content-between align-items-center mobile-header-row py-0 py-md-2 px-2 px-md-3">
+            {/* Logo y Nombre del Hotel */}
+            <div className="d-flex align-items-center gap-2">
+              <div
+                className="exec-logo d-flex align-items-center justify-content-center flex-shrink-0"
+                style={{ width: "32px", height: "32px", minWidth: "32px", fontSize: "0.95rem" }}
+              >
                 <i className="bi bi-buildings-fill" aria-hidden="true"></i>
               </div>
               <div>
                 <div className="d-flex align-items-center gap-2">
-                  <span className="exec-brand-name">Grupo Hotelero Paraíso</span>
-                  <span className="exec-tag">{sesion.rol}</span>
+                  <span className="exec-brand-name" style={{ fontSize: "0.9rem", lineHeight: "1.2" }}>
+                    Grupo Hotelero Paraíso
+                  </span>
+                  <span className="exec-tag d-none d-md-inline-flex">{sesion.rol}</span>
                 </div>
-                <div className="exec-brand-sub">
+                {/* Oculto en móvil (< 768px) para no ensanchar la barra verticalmente */}
+                <div className="exec-brand-sub d-none d-md-block">
                   Sistema de Gestión de Hoteles y Habitaciones
                 </div>
               </div>
             </div>
 
-            {/* Usuario Activo y Botón de Cerrar Sesión */}
-            <div className="d-flex align-items-center gap-2 mt-2 mt-sm-0 ms-auto">
+            {/* Usuario Activo y Botón de Cerrar Sesión en la misma fila */}
+            <div className="d-flex align-items-center gap-2 ms-auto flex-shrink-0">
+              <span
+                className="exec-tag d-inline-flex d-md-none py-0 px-2"
+                style={{ fontSize: "0.68rem" }}
+              >
+                {sesion.rol}
+              </span>
               <div className="exec-user-chip d-none d-md-flex">
                 <i className="bi bi-person-badge" aria-hidden="true"></i>
                 <span>{sesion.nombre}</span>
@@ -189,12 +206,13 @@ function App() {
               <button
                 type="button"
                 onClick={manejarCerrarSesion}
-                className="exec-logout"
+                className="exec-logout d-inline-flex align-items-center gap-1 py-1 px-2"
+                style={{ fontSize: "0.78rem" }}
                 title="Cerrar sesión"
                 aria-label="Cerrar sesión"
               >
                 <i className="bi bi-box-arrow-right" aria-hidden="true"></i>
-                <span>Salir</span>
+                <span className="d-none d-sm-inline">Salir</span>
               </button>
             </div>
           </div>
@@ -202,7 +220,7 @@ function App() {
 
         {/* NAVEGACIÓN POR MÓDULOS SEGÚN EL ROL */}
         <nav className="exec-nav" aria-label="Módulos del sistema">
-          <div className="exec-container d-flex align-items-center justify-content-between">
+          <div className="exec-container d-none d-md-flex align-items-center justify-content-between">
             <div className="nav-pills-luxury">
               {modulosVisibles.map((item) => {
                 const activo = vista === item.id;
@@ -217,6 +235,42 @@ function App() {
                   >
                     <i className={`bi ${item.icono}`} aria-hidden="true"></i>
                     <span>{item.titulo}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div
+            className="exec-container d-flex d-md-none p-0 sticky-top bg-white border-bottom shadow-sm"
+            style={{ top: 0, zIndex: 1020 }}
+          >
+            <div className="d-flex w-100 gap-1 p-1 mobile-nav-pills" style={{ minHeight: "34px" }}>
+              {modulosVisibles.map((item) => {
+                const activo = vista === item.id;
+                const tituloCorto =
+                  item.id === 'catalogo'
+                    ? 'Estancias'
+                    : item.id === 'reservaciones'
+                      ? 'Reservas'
+                      : item.id === 'ia'
+                        ? 'Asistente IA'
+                        : item.id === 'habitaciones'
+                          ? 'Habitaciones'
+                          : item.id === 'consultas'
+                            ? 'Consultas'
+                            : item.titulo;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    title={item.descripcion}
+                    aria-current={activo ? 'page' : undefined}
+                    className={`nav-pill-btn flex-fill d-flex align-items-center justify-content-center gap-1 py-1 px-1 text-nowrap ${activo ? 'active' : ''}`}
+                    style={{ fontSize: '0.72rem', minHeight: '30px', lineHeight: 1 }}
+                    onClick={() => setVista(item.id)}
+                  >
+                    <i className={`bi ${item.icono}`} style={{ fontSize: '0.76rem' }} aria-hidden="true"></i>
+                    <span>{tituloCorto}</span>
                   </button>
                 );
               })}

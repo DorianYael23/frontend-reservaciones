@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import type { SesionUsuario } from "../types";
 import { authLogin, authRegistro, authVerificarCodigo } from "../services/api";
 
-// Reexportamos para mantener compatibilidad con componentes que importen SesionUsuario desde aquí
 export type { SesionUsuario };
 
 interface LoginViewProps {
@@ -19,21 +18,21 @@ const TEXTOS: Record<
     tag: "ACCESO AL SISTEMA",
     icono: "bi-key-fill",
     titulo: "Bienvenido de nuevo",
-    subtitulo: "Ingrese sus credenciales para acceder al sistema.",
+    subtitulo: "Ingrese sus credenciales para acceder.",
     boton: "Iniciar sesión",
   },
   registro: {
     tag: "NUEVA CUENTA",
     icono: "bi-person-plus-fill",
     titulo: "Crear cuenta",
-    subtitulo: "Regístrese y le enviaremos un código de verificación a su correo.",
+    subtitulo: "Regístrese para activar su acceso.",
     boton: "Registrarme y enviar código",
   },
   verificar: {
     tag: "ACTIVACIÓN DE SEGURIDAD",
     icono: "bi-shield-check",
     titulo: "Verifique su correo",
-    subtitulo: "Ingrese el código de 6 dígitos que enviamos a su correo para activar la cuenta.",
+    subtitulo: "Ingrese el código de 6 dígitos enviado.",
     boton: "Confirmar y activar cuenta",
   },
 };
@@ -67,11 +66,10 @@ const Campo: React.FC<{
   label: string;
   icono: string;
   extra?: React.ReactNode;
-  ayuda?: string;
   children: React.ReactNode;
-}> = ({ id, label, icono, extra, ayuda, children }) => (
+}> = ({ id, label, icono, extra, children }) => (
   <div className="login-field">
-    <label htmlFor={id} className="input-label">
+    <label htmlFor={id} className="input-label mb-1" style={{ fontSize: "0.73rem" }}>
       {label} <span className="login-req">*</span>
     </label>
     <div className="login-input-wrap">
@@ -79,7 +77,6 @@ const Campo: React.FC<{
       {children}
       {extra}
     </div>
-    {ayuda && <small className="login-help">{ayuda}</small>}
   </div>
 );
 
@@ -207,37 +204,43 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <main className="login-main">
         <div className="login-card">
           <div className="login-body">
-            <header className="login-head">
-              <div className="login-head-badge-row">
-                <div className="login-head-icon">
+            <header className="login-head mb-2">
+              <div className="login-head-badge-row mb-1">
+                <div className="login-head-icon" style={{ width: 28, height: 28, fontSize: "0.8rem" }}>
                   <i className={`bi ${textos.icono}`} aria-hidden="true"></i>
                 </div>
-                <span className="login-head-tag">{textos.tag}</span>
+                <span className="login-head-tag" style={{ fontSize: "0.6rem", padding: "0.1rem 0.4rem" }}>
+                  {textos.tag}
+                </span>
               </div>
 
-              <h2>{textos.titulo}</h2>
+              <h2 style={{ fontSize: "1.2rem", marginBottom: "0.1rem" }}>{textos.titulo}</h2>
 
               {alerta ? (
                 <div
-                  className={`login-alert login-alert-${alerta.tipo}`}
+                  className={`login-alert login-alert-${alerta.tipo} py-1 px-2 my-1`}
                   role={alerta.tipo === "danger" ? "alert" : "status"}
+                  style={{ fontSize: "0.75rem" }}
                 >
                   <i className={`bi ${ICONO_ALERTA[alerta.tipo]}`} aria-hidden="true"></i>
                   <span>{alerta.texto}</span>
                 </div>
               ) : (
-                <p>{textos.subtitulo}</p>
+                <p className="text-muted" style={{ fontSize: "0.78rem", lineHeight: "1.2" }}>
+                  {textos.subtitulo}
+                </p>
               )}
             </header>
 
-            <form onSubmit={manejarSubmit} className="login-form">
+            <form onSubmit={manejarSubmit} className="login-form" style={{ gap: "0.45rem" }}>
               {modo === "registro" && (
                 <Campo id="login-nombre" label="Nombre completo" icono="bi-person">
                   <input
                     id="login-nombre"
                     type="text"
                     className="input-luxury"
-                    placeholder="Ej. María López García"
+                    style={{ height: "36px", fontSize: "0.85rem" }}
+                    placeholder="Ej. María López"
                     autoComplete="name"
                     required
                     value={nombre}
@@ -251,6 +254,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   id="login-email"
                   type="email"
                   className="input-luxury"
+                  style={{ height: "36px", fontSize: "0.85rem" }}
                   placeholder="nombre@correo.com"
                   autoComplete="email"
                   required
@@ -262,9 +266,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               {modo !== "verificar" ? (
                 <Campo
                   id="login-password"
-                  label="Contraseña"
+                  label="Contraseña (mín. 6 carac.)"
                   icono="bi-lock"
-                  ayuda={modo === "registro" ? "Mínimo 6 caracteres." : undefined}
                   extra={
                     <button
                       type="button"
@@ -272,8 +275,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       onClick={() => setVerPassword((v) => !v)}
                       aria-label={verPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                       tabIndex={-1}
+                      style={{ width: 28, height: 28 }}
                     >
-                      <i className={`bi ${verPassword ? "bi-eye-slash" : "bi-eye"}`}></i>
+                      <i className={`bi ${verPassword ? "bi-eye-slash" : "bi-eye"}`} style={{ fontSize: "0.85rem" }}></i>
                     </button>
                   }
                 >
@@ -281,6 +285,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     id="login-password"
                     type={verPassword ? "text" : "password"}
                     className="input-luxury has-extra"
+                    style={{ height: "36px", fontSize: "0.85rem" }}
                     placeholder="••••••••"
                     autoComplete={modo === "login" ? "current-password" : "new-password"}
                     required
@@ -291,7 +296,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </Campo>
               ) : (
                 <div className="login-field">
-                  <label htmlFor="login-codigo" className="input-label">
+                  <label htmlFor="login-codigo" className="input-label mb-1" style={{ fontSize: "0.73rem" }}>
                     Código de verificación <span className="login-req">*</span>
                   </label>
                   <input
@@ -301,14 +306,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     autoComplete="one-time-code"
                     maxLength={6}
                     className="input-luxury login-code"
+                    style={{ height: "42px", fontSize: "1.2rem" }}
                     placeholder="000000"
                     required
                     value={codigo}
                     onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   />
-                  <small className="login-help login-help-center">
-                    <i className="bi bi-envelope-check me-1" aria-hidden="true"></i>
-                    Revise su bandeja de entrada y escriba aquí los 6 números.
+                  <small className="login-help text-muted" style={{ fontSize: "0.68rem" }}>
+                    Ingrese los 6 números enviados a su correo.
                   </small>
                 </div>
               )}
@@ -316,7 +321,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-luxury-primary login-submit"
+                className="btn-luxury-primary login-submit mt-1"
+                style={{ height: "38px", fontSize: "0.82rem" }}
               >
                 {loading ? (
                   <>
@@ -330,8 +336,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 ) : (
                   <>
                     <span>{textos.boton}</span>
-                    <span className="login-submit-arrow">
-                      <i className="bi bi-arrow-right" aria-hidden="true"></i>
+                    <span className="login-submit-arrow" style={{ width: 26, height: 26 }}>
+                      <i className="bi bi-arrow-right" aria-hidden="true" style={{ fontSize: "0.75rem" }}></i>
                     </span>
                   </>
                 )}
@@ -339,16 +345,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             </form>
           </div>
 
-          <div className="login-switch">
+          <div className="login-switch pt-1">
             {modo === "login" ? (
               <>
-                <div className="login-divider">
-                  <span>¿Necesita otra opción?</span>
+                <div className="login-divider mb-2">
+                  <span style={{ fontSize: "0.62rem" }}>¿Necesita otra opción?</span>
                 </div>
                 <div className="login-switch-grid">
                   <button
                     type="button"
-                    className="login-action-btn"
+                    className="login-action-btn py-1 px-2"
+                    style={{ fontSize: "0.74rem" }}
                     onClick={() => cambiarModo("registro")}
                   >
                     <i className="bi bi-person-plus"></i>
@@ -356,7 +363,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </button>
                   <button
                     type="button"
-                    className="login-action-btn"
+                    className="login-action-btn py-1 px-2"
+                    style={{ fontSize: "0.74rem" }}
                     onClick={() => cambiarModo("verificar")}
                   >
                     <i className="bi bi-shield-check"></i>
@@ -365,13 +373,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </div>
               </>
             ) : (
-              <div className="login-switch-back">
-                <span className="text-muted small">
-                  {modo === "registro" ? "¿Ya tiene una cuenta registrada?" : "¿Ya activó su cuenta?"}
-                </span>
+              <div className="login-switch-back pt-1">
                 <button
                   type="button"
-                  className="login-action-btn w-100 mt-2"
+                  className="login-action-btn w-0 py-1 px-3 w-100"
+                  style={{ fontSize: "0.75rem" }}
                   onClick={() => cambiarModo("login")}
                 >
                   <i className="bi bi-arrow-left"></i>
