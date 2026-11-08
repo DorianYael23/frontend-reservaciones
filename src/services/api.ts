@@ -14,7 +14,7 @@ import type {
 const hostActual = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 export const API_URL = (import.meta as any).env?.VITE_API_URL || `http://${hostActual}:8082/api`;
 
-// Función auxiliar estándar para procesar respuestas y capturar errores del backend
+// Función auxiliar estándar para procesar respuestas y capturar errores del backend 
 async function procesarRespuesta(res: Response) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
