@@ -9,6 +9,8 @@ import UsuariosCrud from './components/UsuariosCrud';
 import LoginView, { type SesionUsuario } from './components/LoginView';
 import CatalogoHabitacionesView from './components/CatalogoHabitacionesView';
 
+type RolSistema = 'ADMIN' | 'GERENTE' | 'RECEPCIONISTA' | 'HUESPED';
+
 type ModuloActivo =
   | 'hoteles'
   | 'tipos'
@@ -24,7 +26,7 @@ type Modulo = {
   titulo: string;
   descripcion: string;
   icono: string;
-  rolesPermitidos: ('ADMIN' | 'HUESPED')[];
+  rolesPermitidos: RolSistema[];
 };
 
 const STORAGE_SESION_KEY = 'paraiso_auth_sesion_v1';
@@ -47,7 +49,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const esRutaAuth = url.includes('/api/auth/');
 
   if (esBackend && !esRutaAuth) {
-    const guardada = localStorage.getItem(STORAGE_SESION_KEY);
+    const guardada =
+      sessionStorage.getItem(STORAGE_SESION_KEY) ||
+      localStorage.getItem(STORAGE_SESION_KEY);
     if (guardada) {
       try {
         const sesion: SesionUsuario = JSON.parse(guardada);
@@ -93,21 +97,21 @@ const MODULOS: Modulo[] = [
     titulo: 'Explorar Estancias',
     descripcion: 'Fotos, tarifas y reservas directas',
     icono: 'bi-compass-fill',
-    rolesPermitidos: ['HUESPED'],
+    rolesPermitidos: ['RECEPCIONISTA', 'HUESPED'],
   },
   {
     id: 'reservaciones',
     titulo: 'Mis Reservaciones',
     descripcion: 'Control de estancias y pagos',
     icono: 'bi-calendar2-check-fill',
-    rolesPermitidos: ['ADMIN', 'HUESPED'],
+    rolesPermitidos: ['RECEPCIONISTA', 'HUESPED'],
   },
   {
     id: 'consultas',
     titulo: 'Consultas y Reportes',
     descripcion: 'Disponibilidad y filtros',
     icono: 'bi-search-heart',
-    rolesPermitidos: ['ADMIN'],
+    rolesPermitidos: ['GERENTE'],
   },
   {
     id: 'usuarios',
@@ -121,17 +125,23 @@ const MODULOS: Modulo[] = [
     titulo: 'Asistente IA',
     descripcion: 'Consultas en lenguaje natural',
     icono: 'bi-robot',
-    rolesPermitidos: ['ADMIN', 'HUESPED'],
+    rolesPermitidos: ['GERENTE', 'RECEPCIONISTA', 'HUESPED'],
   },
 ];
 
 function App() {
   const [sesion, setSesion] = useState<SesionUsuario | null>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_SESION_KEY);
+      const saved =
+        sessionStorage.getItem(STORAGE_SESION_KEY) ||
+        localStorage.getItem(STORAGE_SESION_KEY);
       if (!saved) return null;
       const parsed = JSON.parse(saved);
-      return parsed && parsed.token && parsed.rol ? parsed : null;
+      if (parsed && parsed.token && parsed.rol) {
+        sessionStorage.setItem(STORAGE_SESION_KEY, saved);
+        return parsed;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -141,16 +151,23 @@ function App() {
 
   useEffect(() => {
     if (sesion) {
-      setVista(sesion.rol === 'ADMIN' ? 'hoteles' : 'catalogo');
+      const rol = (sesion.rol as string) as RolSistema;
+      if (rol === 'ADMIN') setVista('hoteles');
+      else if (rol === 'GERENTE') setVista('consultas');
+      else if (rol === 'RECEPCIONISTA') setVista('reservaciones');
+      else setVista('catalogo');
     }
   }, [sesion]);
 
   const manejarLoginExitoso = (nuevaSesion: SesionUsuario) => {
-    localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify(nuevaSesion));
+    const json = JSON.stringify(nuevaSesion);
+    sessionStorage.setItem(STORAGE_SESION_KEY, json);
+    localStorage.setItem(STORAGE_SESION_KEY, json);
     setSesion(nuevaSesion);
   };
 
   const manejarCerrarSesion = () => {
+    sessionStorage.removeItem(STORAGE_SESION_KEY);
     localStorage.removeItem(STORAGE_SESION_KEY);
     setSesion(null);
   };
@@ -159,8 +176,10 @@ function App() {
     return <LoginView onLoginSuccess={manejarLoginExitoso} />;
   }
 
+  const rolActual = (sesion.rol as string) as RolSistema;
+
   const modulosVisibles = MODULOS.filter((m) =>
-    m.rolesPermitidos.includes(sesion.rol)
+    m.rolesPermitidos.includes(rolActual)
   );
 
   return (
@@ -184,14 +203,13 @@ function App() {
                   </span>
                   <span className="exec-tag d-none d-md-inline-flex">{sesion.rol}</span>
                 </div>
-                {/* Oculto en móvil (< 768px) para no ensanchar la barra verticalmente */}
                 <div className="exec-brand-sub d-none d-md-block">
                   Sistema de Gestión de Hoteles y Habitaciones
                 </div>
               </div>
             </div>
 
-            {/* Usuario Activo y Botón de Cerrar Sesión en la misma fila */}
+            {/* Usuario Activo y Botón de Cerrar Sesión */}
             <div className="d-flex align-items-center gap-2 ms-auto flex-shrink-0">
               <span
                 className="exec-tag d-inline-flex d-md-none py-0 px-2"
@@ -224,6 +242,10 @@ function App() {
             <div className="nav-pills-luxury">
               {modulosVisibles.map((item) => {
                 const activo = vista === item.id;
+                const tituloBoton =
+                  item.id === 'reservaciones' && rolActual === 'RECEPCIONISTA'
+                    ? 'Control de Reservaciones'
+                    : item.titulo;
                 return (
                   <button
                     key={item.id}
@@ -234,7 +256,7 @@ function App() {
                     onClick={() => setVista(item.id)}
                   >
                     <i className={`bi ${item.icono}`} aria-hidden="true"></i>
-                    <span>{item.titulo}</span>
+                    <span>{tituloBoton}</span>
                   </button>
                 );
               })}
@@ -281,24 +303,27 @@ function App() {
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="page-container">
-        {sesion.rol === 'ADMIN' && vista === 'hoteles' && <HotelesCrud />}
-        {sesion.rol === 'ADMIN' && vista === 'tipos' && <TiposCrud />}
-        {sesion.rol === 'ADMIN' && vista === 'habitaciones' && <HabitacionesCrud />}
+        {rolActual === 'ADMIN' && vista === 'hoteles' && <HotelesCrud />}
+        {rolActual === 'ADMIN' && vista === 'tipos' && <TiposCrud />}
+        {rolActual === 'ADMIN' && vista === 'habitaciones' && <HabitacionesCrud />}
 
-        {/* Catálogo de habitaciones disponible para huéspedes */}
-        {vista === 'catalogo' && (
+        {(rolActual === 'HUESPED' || rolActual === 'RECEPCIONISTA') && vista === 'catalogo' && (
           <CatalogoHabitacionesView
             sesion={sesion}
             onReservacionExitosa={() => setVista('reservaciones')}
           />
         )}
 
-        {vista === 'reservaciones' && <ReservacionesCrud sesion={sesion} />}
-        {sesion.rol === 'ADMIN' && vista === 'consultas' && <ConsultasView />}
-        {sesion.rol === 'ADMIN' && vista === 'usuarios' && <UsuariosCrud />}
-        <div className={vista === 'ia' ? 'd-block' : 'd-none'}>
-          <AsistenteIaView sesion={sesion} />
-        </div>
+        {(rolActual === 'HUESPED' || rolActual === 'RECEPCIONISTA') && vista === 'reservaciones' && (
+          <ReservacionesCrud sesion={sesion} />
+        )}
+        {rolActual === 'GERENTE' && vista === 'consultas' && <ConsultasView />}
+        {rolActual === 'ADMIN' && vista === 'usuarios' && <UsuariosCrud />}
+        {rolActual !== 'ADMIN' && (
+          <div className={vista === 'ia' ? 'd-block' : 'd-none'}>
+            <AsistenteIaView sesion={sesion} />
+          </div>
+        )}
       </main>
     </div>
   );

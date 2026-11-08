@@ -71,7 +71,8 @@ const obtenerFechaLocalIso = (diasSumar = 0, fechaBase?: string): string => {
 
 export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) => {
   const hoyIso = obtenerFechaLocalIso(0);
-  const esAdmin = sesion?.rol === "ADMIN";
+  const esAdmin =
+    sesion?.rol === "ADMIN" || (sesion?.rol as string) === "RECEPCIONISTA";
 
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([]);
   const [ocupacionGlobal, setOcupacionGlobal] = useState<OcupacionFecha[]>([]);
@@ -79,6 +80,10 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
   const [tiposHabitacion, setTiposHabitacion] = useState<TipoHabitacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
+
+  // Paginación
+  const [paginaActual, setPaginaActual] = useState(1);
+  const registrosPorPagina = 7;
 
   // Notificaciones flotantes
   const [exito, setExito] = useState<string | null>(null);
@@ -311,6 +316,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
 
       setExito(data.mensaje || "Reservación guardada exitosamente.");
       setModalFormAbierto(false);
+      setPaginaActual(1);
       cargarDatos();
     } catch {
       setErrorModal("Error de conexión con el servidor.");
@@ -385,29 +391,48 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
     }
   };
 
-  // Procesar Pago Simulado del Huésped
+  // Procesar Pago Simulado del Huésped y disparar envío de Ticket por correo
   const manejarPagoSimulado = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reservacionAPagar?.id_reservacion) return;
     setProcesandoPago(true);
 
-    const payload = {
-      habitacion: { id_habitacion: reservacionAPagar.habitacion.id_habitacion },
-      nombre_cliente: reservacionAPagar.nombre_cliente,
-      telefono: reservacionAPagar.telefono,
-      email: reservacionAPagar.email || null,
-      fecha_entrada: reservacionAPagar.fecha_entrada,
-      fecha_salida: reservacionAPagar.fecha_salida,
-      num_huespedes: reservacionAPagar.num_huespedes,
-      estado: "Confirmada",
-    };
+    const digitosTarjeta = numTarjeta.replace(/\D/g, "");
+    const terminacion =
+      digitosTarjeta.length >= 4 ? digitosTarjeta.slice(-4) : "4242";
+
+    const correoDestino =
+      reservacionAPagar.email?.trim() || sesion?.email?.trim() || null;
 
     try {
-      const res = await fetch(`${API_RESERVACIONES}/${reservacionAPagar.id_reservacion}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      if (!reservacionAPagar.email && correoDestino) {
+        await fetch(`${API_RESERVACIONES}/${reservacionAPagar.id_reservacion}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            habitacion: { id_habitacion: reservacionAPagar.habitacion.id_habitacion },
+            nombre_cliente: reservacionAPagar.nombre_cliente,
+            telefono: reservacionAPagar.telefono,
+            email: correoDestino,
+            fecha_entrada: reservacionAPagar.fecha_entrada,
+            fecha_salida: reservacionAPagar.fecha_salida,
+            num_huespedes: reservacionAPagar.num_huespedes,
+            estado: "Pendiente",
+          }),
+        });
+      }
+
+      const res = await fetch(
+        `${API_RESERVACIONES}/${reservacionAPagar.id_reservacion}/pagar`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            terminacionTarjeta: terminacion,
+            titularTarjeta: reservacionAPagar.nombre_cliente,
+          }),
+        }
+      );
 
       const data = await res.json();
       if (!res.ok) {
@@ -415,7 +440,10 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         return;
       }
 
-      setExito("¡Pago procesado con éxito! Reservación confirmada.");
+      setExito(
+        data.mensaje ||
+          "¡Pago procesado con éxito! Reservación confirmada y ticket enviado al correo."
+      );
       setReservacionAPagar(null);
       setNumTarjeta("");
       setExpiracion("");
@@ -484,6 +512,19 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
   ).length;
   const totalEnCurso = reservaciones.filter((r) => r.estado === "En Curso").length;
 
+  // Ordenar de la más reciente a la más antigua y paginar
+  const reservacionesOrdenadas = [...reservaciones].sort(
+    (a, b) => (b.id_reservacion || 0) - (a.id_reservacion || 0)
+  );
+  const totalPaginas = Math.max(1, Math.ceil(reservacionesOrdenadas.length / registrosPorPagina));
+  const paginaSegura = Math.min(paginaActual, totalPaginas);
+  const indiceInicio = (paginaSegura - 1) * registrosPorPagina;
+  const indiceFin = Math.min(indiceInicio + registrosPorPagina, reservacionesOrdenadas.length);
+  const reservacionesPaginadas = reservacionesOrdenadas.slice(
+    indiceInicio,
+    indiceInicio + registrosPorPagina
+  );
+
   return (
     <div>
       {/* NOTIFICACIONES TOAST */}
@@ -506,7 +547,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       )}
 
-      {/* STRIP DE KPIS (Compacto en 3 columnas en móvil, normal en PC) */}
+      {/* STRIP DE KPIS */}
       <div className="row g-2 g-md-3 mb-3 mb-md-4">
         <div className="col-4 col-md-4">
           <div className="stat-box d-flex justify-content-between align-items-center shadow-sm p-2 p-md-3 h-100">
@@ -623,9 +664,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
           </div>
         </div>
 
-        {/* =====================================================================
-            VISTA DE CELULAR (< 768px): TARJETAS LIGERAS SIN TABLA PESADA
-           ===================================================================== */}
+        {/* VISTA DE CELULAR (< 768px) */}
         <div className="d-md-none p-2">
           {loading ? (
             <div className="text-center py-4 text-muted small">
@@ -637,7 +676,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
             </div>
           ) : (
             <div className="d-flex flex-column gap-3">
-              {reservaciones.map((res) => {
+              {reservacionesPaginadas.map((res) => {
                 const codigoFolio = res.folio || `R${10000 + (res.id_reservacion || 0)}`;
                 const puedeHacerCheckInHoy =
                   res.estado === "Confirmada" && hoyIso >= res.fecha_entrada;
@@ -651,7 +690,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                       border: "1px solid #e4e4e7",
                     }}
                   >
-                    {/* Fila 1: Folio (Click para copiar) + Estatus */}
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <button
                         type="button"
@@ -669,7 +707,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                       {renderBadgeEstado(res.estado)}
                     </div>
 
-                    {/* Fila 2: Habitación y Hotel */}
                     <div className="mb-2">
                       <div className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>
                         Hab. #{res.habitacion?.numero} · {res.habitacion?.tipoHabitacion?.nombre}
@@ -687,7 +724,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                       )}
                     </div>
 
-                    {/* Fila 3: Fechas en recuadro compacto */}
                     <div
                       className="rounded-3 p-2 mb-2 d-flex justify-content-between align-items-center small"
                       style={{ backgroundColor: "#fafafa", border: "1px solid #f4f4f5" }}
@@ -707,7 +743,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                       </div>
                     </div>
 
-                    {/* Fila 4: Total y Botón de Acción */}
                     <div className="d-flex justify-content-between align-items-center pt-2 border-top">
                       <div>
                         <span className="text-muted d-block" style={{ fontSize: "0.7rem" }}>
@@ -791,9 +826,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
           )}
         </div>
 
-        {/* =====================================================================
-            VISTA DE ESCRITORIO (>= 768px): TU TABLA ORIGINAL INTACTA
-           ===================================================================== */}
+        {/* VISTA DE ESCRITORIO (>= 768px) */}
         <div className="table-responsive d-none d-md-block">
           <table className="table-luxury">
             <thead>
@@ -821,7 +854,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                   </td>
                 </tr>
               ) : (
-                reservaciones.map((res) => {
+                reservacionesPaginadas.map((res) => {
                   const puedeHacerCheckInHoy =
                     res.estado === "Confirmada" && hoyIso >= res.fecha_entrada;
 
@@ -964,11 +997,61 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
             </tbody>
           </table>
         </div>
+
+        {/* CONTROLES DE PAGINACIÓN */}
+        {!loading && reservaciones.length > registrosPorPagina && (
+          <div className="d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-3 border-top gap-2">
+            <div className="text-muted small">
+              Mostrando <strong>{indiceInicio + 1}</strong> – <strong>{indiceFin}</strong> de{" "}
+              <strong>{reservaciones.length}</strong> reservaciones
+            </div>
+
+            <div className="d-flex align-items-center gap-1">
+              <button
+                type="button"
+                className="btn-luxury-outline py-1 px-2 small"
+                disabled={paginaSegura === 1}
+                onClick={() => setPaginaActual(1)}
+                title="Primera página"
+              >
+                <i className="bi bi-chevron-double-left"></i>
+              </button>
+              <button
+                type="button"
+                className="btn-luxury-outline py-1 px-3 small"
+                disabled={paginaSegura === 1}
+                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </button>
+
+              <span className="px-2 px-md-3 small fw-semibold">
+                Pág. {paginaSegura} / {totalPaginas}
+              </span>
+
+              <button
+                type="button"
+                className="btn-luxury-outline py-1 px-3 small"
+                disabled={paginaSegura === totalPaginas}
+                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+              >
+                Siguiente
+              </button>
+              <button
+                type="button"
+                className="btn-luxury-outline py-1 px-2 small"
+                disabled={paginaSegura === totalPaginas}
+                onClick={() => setPaginaActual(totalPaginas)}
+                title="Última página"
+              >
+                <i className="bi bi-chevron-double-right"></i>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* =========================================================================
-          MODAL 1: FORMULARIO CREAR / EDITAR RESERVACIÓN (ADMIN)
-         ========================================================================= */}
+      {/* MODAL 1: FORMULARIO CREAR / EDITAR RESERVACIÓN */}
       {modalFormAbierto && (
         <div className="modal-backdrop-custom" onClick={() => setModalFormAbierto(false)}>
           <div
@@ -1031,13 +1114,16 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                     </div>
                   </div>
                   <div className="col-md-6">
-                    <label className="input-label">Correo Electrónico (Opcional)</label>
+                    <label className="input-label">
+                      Correo Electrónico <span className="login-req">*</span>
+                    </label>
                     <div className="login-input-wrap">
                       <i className="bi bi-envelope login-input-icon"></i>
                       <input
                         type="email"
                         className="input-luxury"
                         placeholder="nombre@correo.com"
+                        required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                       />
@@ -1175,7 +1261,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                   </div>
                 </div>
 
-                {/* Resumen de Tarifa */}
                 <div
                   className="rounded-4 p-3 d-flex justify-content-between align-items-center text-white mt-3"
                   style={{
@@ -1224,9 +1309,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       )}
 
-      {/* =========================================================================
-          MODAL 2: PASARELA DE PAGO SIMULADO (HUÉSPED)
-         ========================================================================= */}
+      {/* MODAL 2: PASARELA DE PAGO SIMULADO */}
       {reservacionAPagar && (
         <div className="modal-backdrop-custom" onClick={() => setReservacionAPagar(null)}>
           <div
@@ -1250,7 +1333,6 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
 
             <form onSubmit={manejarPagoSimulado}>
               <div className="modal-window-body">
-                {/* Desglose de cobro */}
                 <div className="p-3 bg-light rounded-3 border mb-3">
                   <div className="d-flex justify-content-between mb-1">
                     <span className="text-muted small">Habitación:</span>
@@ -1371,9 +1453,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         </div>
       )}
 
-      {/* =========================================================================
-          MODAL 3: CONFIRMACIÓN PARA ELIMINAR (ADMIN)
-         ========================================================================= */}
+      {/* MODAL 3: CONFIRMACIÓN PARA ELIMINAR */}
       {reservacionAEliminar && (
         <div className="modal-backdrop-custom" onClick={() => setReservacionAEliminar(null)}>
           <div

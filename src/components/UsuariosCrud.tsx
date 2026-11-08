@@ -7,6 +7,8 @@ import {
   eliminarUsuario,
 } from "../services/api";
 
+type RolUsuario = "ADMIN" | "GERENTE" | "RECEPCIONISTA" | "HUESPED";
+
 export const UsuariosCrud: React.FC = () => {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +29,7 @@ export const UsuariosCrud: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mostrarPassword, setMostrarPassword] = useState(false);
-  const [rol, setRol] = useState<"ADMIN" | "HUESPED">("HUESPED");
+  const [rol, setRol] = useState<RolUsuario>("HUESPED");
   const [verificado, setVerificado] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
@@ -75,7 +77,7 @@ export const UsuariosCrud: React.FC = () => {
     setEmail(u.email);
     setPassword("");
     setMostrarPassword(false);
-    setRol(u.rol as "ADMIN" | "HUESPED");
+    setRol(((u.rol as string) as RolUsuario) || "HUESPED");
     setVerificado(!!u.verificado);
     setErrorModal(null);
     setMostrarModal(true);
@@ -90,7 +92,7 @@ export const UsuariosCrud: React.FC = () => {
       nombre,
       email,
       password: password || undefined,
-      rol,
+      rol: rol as any,
       verificado,
     };
 
@@ -122,6 +124,19 @@ export const UsuariosCrud: React.FC = () => {
     } catch (err: any) {
       setErrorBanner(err?.mensaje || "No se pudo eliminar el usuario.");
       setUsuarioAEliminar(null);
+    }
+  };
+
+  const obtenerIconoRol = (rolUsuario?: string) => {
+    switch (rolUsuario) {
+      case "ADMIN":
+        return "bi-shield-lock-fill";
+      case "GERENTE":
+        return "bi-bar-chart-fill";
+      case "RECEPCIONISTA":
+        return "bi-person-workspace";
+      default:
+        return "bi-person";
     }
   };
 
@@ -186,66 +201,70 @@ export const UsuariosCrud: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                usuarios.map((u) => (
-                  <tr key={u.id_usuario}>
-                    <td>
-                      <div className="fw-bold">{u.nombre}</div>
-                      <small className="text-muted">ID #{u.id_usuario}</small>
-                    </td>
-                    <td className="text-muted">
-                      <i className="bi bi-envelope me-2"></i>
-                      {u.email}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge-soft ${u.rol === "ADMIN" ? "badge-amber" : "badge-stone"
+                usuarios.map((u) => {
+                  const rolTexto = (u.rol as string) || "HUESPED";
+                  return (
+                    <tr key={u.id_usuario}>
+                      <td>
+                        <div className="fw-bold">{u.nombre}</div>
+                        <small className="text-muted">ID #{u.id_usuario}</small>
+                      </td>
+                      <td className="text-muted">
+                        <i className="bi bi-envelope me-2"></i>
+                        {u.email}
+                      </td>
+                      <td>
+                        <span
+                          className={`badge-soft ${
+                            rolTexto === "ADMIN" || rolTexto === "GERENTE"
+                              ? "badge-amber"
+                              : "badge-stone"
                           }`}
-                      >
-                        <i
-                          className={`bi ${u.rol === "ADMIN" ? "bi-shield-lock-fill" : "bi-person"
-                            }`}
-                        ></i>
-                        {u.rol}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className={`badge-soft ${u.verificado ? "badge-emerald" : "badge-rose"
+                        >
+                          <i className={`bi ${obtenerIconoRol(rolTexto)}`}></i>
+                          {rolTexto}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`badge-soft ${
+                            u.verificado ? "badge-emerald" : "badge-rose"
                           }`}
-                      >
-                        <span className="dot"></span>
-                        {u.verificado ? "Verificado" : "Pendiente"}
-                      </span>
-                    </td>
-                    <td className="text-muted small">
-                      <i className="bi bi-calendar3 me-1"></i>
-                      {u.fecha_registro}
-                    </td>
-                    <td className="text-end">
-                      <button
-                        className="action-icon-btn me-1"
-                        title="Detalle"
-                        onClick={() => setUsuarioDetalle(u)}
-                      >
-                        <i className="bi bi-eye"></i>
-                      </button>
-                      <button
-                        className="action-icon-btn me-1"
-                        title="Editar"
-                        onClick={() => abrirEditar(u)}
-                      >
-                        <i className="bi bi-pencil"></i>
-                      </button>
-                      <button
-                        className="action-icon-btn delete"
-                        title="Eliminar"
-                        onClick={() => setUsuarioAEliminar(u)}
-                      >
-                        <i className="bi bi-trash3"></i>
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                        >
+                          <span className="dot"></span>
+                          {u.verificado ? "Verificado" : "Pendiente"}
+                        </span>
+                      </td>
+                      <td className="text-muted small">
+                        <i className="bi bi-calendar3 me-1"></i>
+                        {u.fecha_registro}
+                      </td>
+                      <td className="text-end">
+                        <button
+                          className="action-icon-btn me-1"
+                          title="Detalle"
+                          onClick={() => setUsuarioDetalle(u)}
+                        >
+                          <i className="bi bi-eye"></i>
+                        </button>
+                        <button
+                          className="action-icon-btn me-1"
+                          title="Editar"
+                          onClick={() => abrirEditar(u)}
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          className="action-icon-btn delete"
+                          title="Eliminar"
+                          onClick={() => setUsuarioAEliminar(u)}
+                        >
+                          <i className="bi bi-trash3"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -350,7 +369,7 @@ export const UsuariosCrud: React.FC = () => {
                 </div>
 
                 <div className="row g-3">
-                  <div className="col-md-6">
+                  <div className="col-12">
                     <label className="input-label">Rol de Acceso</label>
                     <div className="ia-segment">
                       <button
@@ -363,6 +382,22 @@ export const UsuariosCrud: React.FC = () => {
                       </button>
                       <button
                         type="button"
+                        className={`ia-segment-btn ${rol === "RECEPCIONISTA" ? "active" : ""}`}
+                        onClick={() => setRol("RECEPCIONISTA")}
+                      >
+                        <i className="bi bi-person-workspace"></i>
+                        <span>Recepcionista</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`ia-segment-btn ${rol === "GERENTE" ? "active" : ""}`}
+                        onClick={() => setRol("GERENTE")}
+                      >
+                        <i className="bi bi-bar-chart"></i>
+                        <span>Gerente</span>
+                      </button>
+                      <button
+                        type="button"
                         className={`ia-segment-btn ${rol === "ADMIN" ? "active" : ""}`}
                         onClick={() => setRol("ADMIN")}
                       >
@@ -372,7 +407,7 @@ export const UsuariosCrud: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="col-md-6">
+                  <div className="col-12">
                     <label className="input-label">Estado de Correo</label>
                     <div className="ia-segment">
                       <button
@@ -441,13 +476,14 @@ export const UsuariosCrud: React.FC = () => {
                   </p>
                 </div>
                 <span
-                  className={`badge-soft ${usuarioDetalle.rol === "ADMIN" ? "badge-amber" : "badge-stone"
-                    }`}
+                  className={`badge-soft ${
+                    (usuarioDetalle.rol as string) === "ADMIN" ||
+                    (usuarioDetalle.rol as string) === "GERENTE"
+                      ? "badge-amber"
+                      : "badge-stone"
+                  }`}
                 >
-                  <i
-                    className={`bi ${usuarioDetalle.rol === "ADMIN" ? "bi-shield-lock-fill" : "bi-person"
-                      }`}
-                  ></i>
+                  <i className={`bi ${obtenerIconoRol(usuarioDetalle.rol as string)}`}></i>
                   {usuarioDetalle.rol}
                 </span>
               </div>
