@@ -10,7 +10,9 @@ import type {
     SesionUsuario,
 } from '../types';
 
-export const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8082/api';
+// Detecta dinámicamente si estás en localhost o entrando desde la IP del celular
+const hostActual = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+export const API_URL = (import.meta as any).env?.VITE_API_URL || `http://${hostActual}:8082/api`;
 
 // Función auxiliar estándar para procesar respuestas y capturar errores del backend
 async function procesarRespuesta(res: Response) {

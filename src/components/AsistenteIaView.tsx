@@ -23,7 +23,9 @@ interface AsistenteIaViewProps {
 }
 
 const STORAGE_MODEL_KEY = "paraiso_ai_selected_model_v4";
-const API_BASE_URL = "http://localhost:8082/api/hotel-ai";
+const hostActual = typeof window !== "undefined" ? window.location.hostname : "localhost";
+const API_ROOT = (import.meta as any).env?.VITE_API_URL || `http://${hostActual}:8082/api`;
+const API_BASE_URL = `${API_ROOT}/hotel-ai`;
 
 const obtenerFechaLocalIso = (diasSumar = 0, fechaBase?: string): string => {
   const base = fechaBase ? new Date(fechaBase + "T00:00:00") : new Date();
@@ -74,18 +76,14 @@ const renderizarTextoFormateado = (texto: string): React.ReactNode => {
           const urlImg = matchImagenMd[2];
           return (
             <div key={idx} className="my-2">
-              <div
-                className="card border rounded-4 overflow-hidden shadow-sm"
-                style={{ maxWidth: "420px" }}
-              >
+              <div className="ia2-img card border rounded-4 overflow-hidden shadow-sm">
                 <img
                   src={urlImg}
                   alt={tituloImg}
-                  className="img-fluid w-100"
-                  style={{ height: "220px", objectFit: "cover" }}
+                  style={{ width: "100%", maxHeight: "200px", objectFit: "cover" }}
                 />
                 <div className="p-2 bg-dark text-white small d-flex align-items-center justify-content-between px-3">
-                  <span>
+                  <span className="text-truncate me-2">
                     <i className="bi bi-camera-fill text-warning me-2"></i>
                     {tituloImg}
                   </span>
@@ -93,7 +91,7 @@ const renderizarTextoFormateado = (texto: string): React.ReactNode => {
                     href={urlImg}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-warning text-decoration-none small"
+                    className="text-warning text-decoration-none small flex-shrink-0"
                   >
                     Ver grande
                   </a>
@@ -105,14 +103,13 @@ const renderizarTextoFormateado = (texto: string): React.ReactNode => {
 
         const matchBullet = linea.match(/^([*\-•])\s+(.*)$/);
         if (matchBullet) {
-          const contenido = matchBullet[2];
           return (
-            <div key={idx} className="d-flex align-items-start gap-2 ps-2 py-1">
+            <div key={idx} className="d-flex align-items-start gap-2 ps-1 py-1">
               <span
                 className="rounded-circle bg-warning mt-2 flex-shrink-0"
                 style={{ width: "6px", height: "6px" }}
               />
-              <div style={{ lineHeight: "1.5" }}>{formatearNegritasEnLinea(contenido)}</div>
+              <div style={{ lineHeight: "1.5" }}>{formatearNegritasEnLinea(matchBullet[2])}</div>
             </div>
           );
         }
@@ -120,7 +117,7 @@ const renderizarTextoFormateado = (texto: string): React.ReactNode => {
         const matchNumero = linea.match(/^(\d+\.)\s+(.*)$/);
         if (matchNumero) {
           return (
-            <div key={idx} className="d-flex align-items-start gap-2 ps-2 py-1">
+            <div key={idx} className="d-flex align-items-start gap-2 ps-1 py-1">
               <strong className="text-dark flex-shrink-0">{matchNumero[1]}</strong>
               <div style={{ lineHeight: "1.5" }}>{formatearNegritasEnLinea(matchNumero[2])}</div>
             </div>
@@ -143,8 +140,8 @@ const generarNuevoIdSesion = (): string => {
 
 const crearSesionInicial = (nombreUsuario?: string, idSesion?: string): ConversationSession => {
   const saludoPersonalizado = nombreUsuario
-    ? `¡Hola, **${nombreUsuario}**! Soy tu **Asistente Inteligente Ejecutivo** del Grupo Hotelero Paraíso. Puedo ayudarte a consultar nuestros hoteles, ver **vistas previas en imagen** de las habitaciones, realizar tus reservaciones o modificar tu estancia con tu código de folio. ¿En qué te puedo ayudar hoy?`
-    : "¡Hola! Soy el **Asistente Inteligente Ejecutivo** del Grupo Hotelero Paraíso. ¿En qué te puedo ayudar hoy?";
+    ? `¡Hola, **${nombreUsuario}**! Consulta disponibilidad, reserva habitaciones o gestiona tu estancia con tu código de folio. ¿En qué te ayudo?`
+    : "¡Hola! Consulta disponibilidad, reserva o gestiona tu estancia con tu folio. ¿En qué te ayudo?";
 
   return {
     id: idSesion || generarNuevoIdSesion(),
@@ -175,7 +172,14 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Estado para el modal de confirmación al eliminar un chat
+  // UI estados (Desktop/Tablet + Móvil)
+  const [panelAbierto, setPanelAbierto] = useState(false);
+  const [fechasAbiertas, setFechasAbiertas] = useState<boolean>(
+    () => typeof window !== "undefined" && window.innerWidth >= 992
+  );
+  const [fechasMovilAbiertas, setFechasMovilAbiertas] = useState(false);
+  const [historialMovilAbierto, setHistorialMovilAbierto] = useState(false);
+
   const [chatAEliminar, setChatAEliminar] = useState<ConversationSession | null>(null);
 
   const [escuchandoVoz, setEscuchandoVoz] = useState(false);
@@ -186,6 +190,11 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
   const [fechaSalida, setFechaSalida] = useState<string>(obtenerFechaLocalIso(1, hoyIso));
 
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileChatContainerRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mobileTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const conversationsRef = useRef<ConversationSession[]>(conversations);
+  conversationsRef.current = conversations;
 
   const guardarSesionEnServidor = async (conv: ConversationSession) => {
     if (!sesion?.token) return;
@@ -243,6 +252,7 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
     };
 
     cargarSesionesDelServidor();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sesion?.id_usuario, sesion?.token]);
 
   useEffect(() => {
@@ -253,7 +263,32 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
+    if (mobileChatContainerRef.current) {
+      mobileChatContainerRef.current.scrollTop = mobileChatContainerRef.current.scrollHeight;
+    }
   }, [conversations, activeConvId, loading]);
+
+  // Auto-crecer los textareas
+  useEffect(() => {
+    [textareaRef.current, mobileTextareaRef.current].forEach((el) => {
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 110) + "px";
+    });
+  }, [input]);
+
+  // Cerrar cajón con Escape
+  useEffect(() => {
+    if (!panelAbierto && !historialMovilAbierto) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPanelAbierto(false);
+        setHistorialMovilAbierto(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [panelAbierto, historialMovilAbierto]);
 
   const manejarCambioEntrada = (nuevaEntrada: string) => {
     if (nuevaEntrada < hoyIso) {
@@ -283,6 +318,8 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
     setConversations((prev) => [nueva, ...prev]);
     setActiveConvId(nueva.id);
     setInput("");
+    setPanelAbierto(false);
+    setHistorialMovilAbierto(false);
     guardarSesionEnServidor(nueva);
   };
 
@@ -322,6 +359,8 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
 
     const convId = activeConversation.id;
     const horaActual = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const base =
+      conversationsRef.current.find((c) => c.id === convId) || activeConversation;
 
     const userMsg: ChatMessage = {
       id: "user-" + Date.now(),
@@ -329,29 +368,18 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
       text: preguntaLimpia,
     };
 
-    let conversacionConPregunta: ConversationSession | null = null;
+    const tieneMensajesUsuario = base.messages.some((m) => m.role === "user");
+    const conversacionConPregunta: ConversationSession = {
+      ...base,
+      title: !tieneMensajesUsuario
+        ? preguntaLimpia.slice(0, 34) + (preguntaLimpia.length > 34 ? "..." : "")
+        : base.title,
+      updatedAt: horaActual,
+      messages: [...base.messages, userMsg],
+    };
 
-    setConversations((prev) =>
-      prev.map((conv) => {
-        if (conv.id !== convId) return conv;
-        const tieneMensajesUsuario = conv.messages.some((m) => m.role === "user");
-        const nuevoTitulo = !tieneMensajesUsuario
-          ? preguntaLimpia.slice(0, 34) + (preguntaLimpia.length > 34 ? "..." : "")
-          : conv.title;
-
-        conversacionConPregunta = {
-          ...conv,
-          title: nuevoTitulo,
-          updatedAt: horaActual,
-          messages: [...conv.messages, userMsg],
-        };
-        return conversacionConPregunta;
-      })
-    );
-
-    if (conversacionConPregunta) {
-      guardarSesionEnServidor(conversacionConPregunta);
-    }
+    setConversations((prev) => prev.map((c) => (c.id === convId ? conversacionConPregunta : c)));
+    guardarSesionEnServidor(conversacionConPregunta);
 
     setInput("");
     setLoading(true);
@@ -385,18 +413,18 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
         tiempoMs: data.tiempoMs,
       };
 
+      const conversacionFinal: ConversationSession = {
+        ...conversacionConPregunta,
+        updatedAt: horaActual,
+        messages: [...conversacionConPregunta.messages, assistantMsg],
+      };
+
       setConversations((prev) =>
-        prev.map((conv) => {
-          if (conv.id !== convId) return conv;
-          const actualizada = {
-            ...conv,
-            updatedAt: horaActual,
-            messages: [...conv.messages, assistantMsg],
-          };
-          guardarSesionEnServidor(actualizada);
-          return actualizada;
-        })
+        prev.map((c) =>
+          c.id === convId ? { ...c, updatedAt: horaActual, messages: [...c.messages, assistantMsg] } : c
+        )
       );
+      guardarSesionEnServidor(conversacionFinal);
     } catch {
       const errorMsg: ChatMessage = {
         id: "err-" + Date.now(),
@@ -407,9 +435,7 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
       };
 
       setConversations((prev) =>
-        prev.map((conv) =>
-          conv.id === convId ? { ...conv, messages: [...conv.messages, errorMsg] } : conv
-        )
+        prev.map((c) => (c.id === convId ? { ...c, messages: [...c.messages, errorMsg] } : c))
       );
     } finally {
       setLoading(false);
@@ -439,9 +465,7 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
 
     let textoFinalCapturado = "";
 
-    recognition.onstart = () => {
-      setEscuchandoVoz(true);
-    };
+    recognition.onstart = () => setEscuchandoVoz(true);
 
     recognition.onresult = (event: any) => {
       let transcripcionInterina = "";
@@ -456,9 +480,7 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
       setInput(textoFinalCapturado || transcripcionInterina);
     };
 
-    recognition.onerror = () => {
-      setEscuchandoVoz(false);
-    };
+    recognition.onerror = () => setEscuchandoVoz(false);
 
     recognition.onend = () => {
       setEscuchandoVoz(false);
@@ -489,389 +511,800 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
         ? `${prev.trim()} (${rango})`
         : `Quiero consultar disponibilidad para reservar ${rango}`
     );
+    setFechasMovilAbiertas(false);
+    textareaRef.current?.focus();
+    mobileTextareaRef.current?.focus();
   };
 
+  const soloBienvenida = activeConversation.messages.every((m) => m.role !== "user");
+
+  const sugerencias = [
+    "¿Qué hoteles tienen?",
+    `Disponibilidad del ${fechaEntrada} al ${fechaSalida}`,
+    "Quiero cancelar o modificar mi reserva",
+  ];
+
   return (
-    <div className="container-fluid py-0">
-      <div className="row g-3">
-        {/* COLUMNA IZQUIERDA */}
+    <div className="container-fluid px-0 py-0">
+      {/* =========================================================================
+          1. VISTA EXCLUSIVA PARA CELULARES (< 768px) — DISEÑO TIPO WHATSAPP/APP
+         ========================================================================= */}
+      <div className="d-md-none">
         <div
-          className="col-12 col-lg-4 d-flex flex-column gap-3"
-          style={{ height: "calc(100vh - 215px)" }}
+          className="rounded-4 shadow-sm d-flex flex-column overflow-hidden"
+          style={{
+            backgroundColor: "#ffffff",
+            border: "1px solid #e4e4e7",
+            height: "calc(100dvh - 165px)",
+            minHeight: "480px",
+          }}
         >
-          <div className="card border-0 shadow-sm rounded-4 p-3">
-            <div className="d-flex align-items-center gap-2 mb-2 fw-semibold text-dark">
-              <i className="bi bi-cpu text-warning"></i>
-              <span>Motor de IA</span>
-            </div>
-
-            <div className="btn-group w-100 bg-light p-1 rounded-3 mb-2" role="group">
-              <button
-                type="button"
-                onClick={() => setModelo("gemini")}
-                className={`btn btn-sm rounded-2 fw-medium ${modelo === "gemini" ? "bg-white shadow-sm text-dark" : "text-secondary border-0"
-                  }`}
+          {/* CABECERA MÓVIL ULTRA COMPACTA */}
+          <div
+            className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
+            style={{ backgroundColor: "#18181b", color: "#ffffff", flexShrink: 0 }}
+          >
+            <div className="d-flex align-items-center gap-2">
+              <div
+                className="rounded-3 d-flex align-items-center justify-content-center"
+                style={{
+                  width: 32,
+                  height: 32,
+                  backgroundColor: "rgba(245, 158, 11, 0.2)",
+                  color: "#fbbf24",
+                }}
               >
-                <i className="bi bi-cloud me-1"></i> Gemini
-              </button>
-              <button
-                type="button"
-                onClick={() => setModelo("llama3.2:3b")}
-                className={`btn btn-sm rounded-2 fw-medium ${modelo === "llama3.2:3b"
-                  ? "bg-white shadow-sm text-dark"
-                  : "text-secondary border-0"
-                  }`}
-              >
-                <i className="bi bi-pc-display me-1"></i> Llama 3.2
-              </button>
-            </div>
-
-            <div className="d-flex align-items-center gap-2 small text-muted">
-              {modelo === "gemini" ? (
-                <>
-                  <span className="badge bg-success-subtle text-success rounded-pill">Nube</span>
-                  <span>Rápido y preciso. Requiere internet.</span>
-                </>
-              ) : (
-                <>
-                  <span className="badge bg-warning-subtle text-warning-emphasis rounded-pill">
-                    Local
-                  </span>
-                  <span>Modelo ligero local, ideal para pruebas.</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="card border-0 shadow-sm rounded-4 p-3 d-flex flex-column flex-grow-1 overflow-hidden">
-            <div className="d-flex justify-content-between align-items-center mb-2">
+                <i className="bi bi-stars"></i>
+              </div>
               <div>
-                <div className="d-flex align-items-center gap-2 fw-semibold text-dark">
-                  <i className="bi bi-clock-history text-warning"></i>
-                  <span>Mis Consultas</span>
+                <div className="fw-bold" style={{ fontSize: "0.88rem", lineHeight: 1.1 }}>
+                  Asistente IA
                 </div>
-                <small className="text-muted" style={{ fontSize: "0.73rem" }}>
-                  Sincronizado en la cuenta de {sesion?.nombre || "tu sesión"}
+                <small style={{ fontSize: "0.68rem", color: "#a1a1aa" }}>
+                  ● {modelo === "gemini" ? "Gemini" : "Llama 3.2"}
                 </small>
               </div>
+            </div>
+
+            {/* Acciones Rápidas Móvil */}
+            <div className="d-flex align-items-center gap-1">
+              {/* Selector rápido de modelo */}
+              <select
+                value={modelo}
+                onChange={(e) => setModelo(e.target.value as "gemini" | "llama3.2:3b")}
+                className="form-select form-select-sm border-0 fw-semibold"
+                style={{
+                  width: "auto",
+                  fontSize: "0.74rem",
+                  backgroundColor: "#27272a",
+                  color: "#fbbf24",
+                  paddingRight: "1.6rem",
+                }}
+                aria-label="Seleccionar modelo"
+              >
+                <option value="gemini">☁️ Gemini</option>
+                <option value="llama3.2:3b">💻 Llama 3.2</option>
+              </select>
+
+              {/* Botón Fechas */}
+              <button
+                type="button"
+                onClick={() => setFechasMovilAbiertas((v) => !v)}
+                className="btn btn-sm d-flex align-items-center justify-content-center"
+                style={{
+                  width: 32,
+                  height: 32,
+                  backgroundColor: fechasMovilAbiertas ? "#f59e0b" : "#27272a",
+                  color: fechasMovilAbiertas ? "#18181b" : "#ffffff",
+                  borderRadius: "8px",
+                }}
+                title="Fechas"
+              >
+                <i className="bi bi-calendar-event"></i>
+              </button>
+
+              {/* Botón Historial (Bottom Sheet) */}
+              <button
+                type="button"
+                onClick={() => setHistorialMovilAbierto(true)}
+                className="btn btn-sm d-flex align-items-center justify-content-center position-relative"
+                style={{
+                  width: 32,
+                  height: 32,
+                  backgroundColor: "#27272a",
+                  color: "#ffffff",
+                  borderRadius: "8px",
+                }}
+                title="Mis consultas"
+              >
+                <i className="bi bi-clock-history"></i>
+              </button>
+
+              {/* Botón Nueva Conversación */}
               <button
                 type="button"
                 onClick={handleNuevaConversacion}
-                className="btn btn-sm btn-dark rounded-3 d-flex align-items-center gap-1"
-                title="Iniciar nueva conversación"
+                className="btn btn-sm d-flex align-items-center justify-content-center"
+                style={{
+                  width: 32,
+                  height: 32,
+                  backgroundColor: "#f59e0b",
+                  color: "#18181b",
+                  borderRadius: "8px",
+                }}
+                title="Nueva consulta"
               >
-                <i className="bi bi-plus-lg"></i> Nueva
+                <i className="bi bi-plus-lg fw-bold"></i>
               </button>
             </div>
-
-            <div className="d-flex flex-column gap-2 overflow-auto pe-1 flex-grow-1 mt-2">
-              {conversations.map((conv, index) => {
-                const esActiva = conv.id === activeConversation.id;
-                return (
-                  <div
-                    key={conv.id}
-                    onClick={() => setActiveConvId(conv.id)}
-                    style={{ cursor: "pointer" }}
-                    className={`d-flex justify-content-between align-items-center p-2 rounded-3 border ${esActiva
-                      ? "bg-dark text-white border-dark"
-                      : "bg-light text-dark border-light-subtle"
-                      }`}
-                  >
-                    <div className="text-truncate me-2" style={{ maxWidth: "82%" }}>
-                      <div className="small fw-medium text-truncate">
-                        <i className="bi bi-chat-left-text me-2"></i>
-                        {conv.title}
-                      </div>
-                      <div
-                        style={{ fontSize: "0.72rem" }}
-                        className={esActiva ? "text-white-50" : "text-muted"}
-                      >
-                        Consulta #{conversations.length - index} · {conv.updatedAt}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => solicitarEliminarConversacion(conv, e)}
-                      className={`btn btn-sm border-0 p-1 ${esActiva ? "text-white-50" : "text-secondary"
-                        }`}
-                      title="Eliminar conversación"
-                    >
-                      <i className="bi bi-trash3"></i>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
           </div>
-        </div>
 
-        {/* Ventana principal del Chat */}
-        <div className="col-12 col-lg-8">
-          <div
-            className="card border-0 shadow-sm rounded-4 d-flex flex-column"
-            style={{ height: "calc(100vh - 215px)" }}
-          >
-            <div className="card-header bg-white border-bottom p-3 d-flex justify-content-between align-items-center rounded-top-4">
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="rounded-3 d-flex align-items-center justify-content-center text-white fw-bold"
-                  style={{
-                    width: "42px",
-                    height: "42px",
-                    background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                  }}
-                >
-                  <i className="bi bi-stars fs-5"></i>
-                </div>
-                <div>
-                  <h6 className="mb-0 fw-bold text-dark">
-                    Asistente Ejecutivo · Hola, {sesion?.nombre || "Huésped"}
-                  </h6>
-                  <small className="text-success d-flex align-items-center gap-1">
-                    <span
-                      className="rounded-circle bg-success d-inline-block"
-                      style={{ width: "8px", height: "8px" }}
-                    ></span>
-                    En línea · {modelo === "gemini" ? "Google Gemini" : "Ollama Llama 3.2:3b"}
-                  </small>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-light border-bottom px-3 py-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small">
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className="fw-medium text-secondary">
-                  <i className="bi bi-calendar-check me-1"></i>Fechas de estancia:
-                </span>
-                <div className="d-flex align-items-center gap-1">
-                  <span className="text-muted">Entrada:</span>
+          {/* PANEL COLAPSABLE DE FECHAS EN MÓVIL */}
+          {fechasMovilAbiertas && (
+            <div
+              className="p-2 border-bottom"
+              style={{ backgroundColor: "#fffbeb", flexShrink: 0 }}
+            >
+              <div className="row g-2 align-items-end">
+                <div className="col-6">
+                  <label className="small fw-semibold text-muted d-block" style={{ fontSize: "0.7rem" }}>
+                    Entrada
+                  </label>
                   <input
                     type="date"
                     className="form-control form-control-sm"
-                    style={{ width: "140px" }}
                     min={hoyIso}
                     value={fechaEntrada}
                     onChange={(e) => manejarCambioEntrada(e.target.value)}
                   />
                 </div>
-                <div className="d-flex align-items-center gap-1">
-                  <span className="text-muted">Salida:</span>
+                <div className="col-6">
+                  <label className="small fw-semibold text-muted d-block" style={{ fontSize: "0.7rem" }}>
+                    Salida
+                  </label>
                   <input
                     type="date"
                     className="form-control form-control-sm"
-                    style={{ width: "140px" }}
                     min={obtenerFechaLocalIso(1, fechaEntrada)}
                     value={fechaSalida}
                     onChange={(e) => manejarCambioSalida(e.target.value)}
                   />
                 </div>
+                <div className="col-12">
+                  <button
+                    type="button"
+                    onClick={insertarFechasEnInput}
+                    className="btn btn-sm w-100 fw-semibold"
+                    style={{ backgroundColor: "#f59e0b", color: "#18181b", fontSize: "0.78rem" }}
+                  >
+                    <i className="bi bi-check2-circle me-1"></i>
+                    Insertar fechas en mi pregunta
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={insertarFechasEnInput}
-                className="btn btn-sm btn-outline-dark rounded-3"
-              >
-                Usar fechas en consulta
-              </button>
             </div>
+          )}
 
-            <div
-              ref={chatContainerRef}
-              className="card-body overflow-auto p-4 d-flex flex-column gap-3"
-              style={{ flex: 1, backgroundColor: "#fcfcfd" }}
-            >
-              {activeConversation.messages.map((msg) => {
-                if (msg.role === "user") {
-                  return (
-                    <div key={msg.id} className="d-flex justify-content-end">
-                      <div
-                        className="bg-dark text-white px-3 py-2 rounded-4 shadow-sm"
-                        style={{ maxWidth: "75%", whiteSpace: "pre-wrap" }}
-                      >
-                        {msg.text}
-                      </div>
-                    </div>
-                  );
-                }
-
-                if (msg.error) {
-                  return (
-                    <div key={msg.id} className="d-flex justify-content-start">
-                      <div
-                        className="border border-danger-subtle bg-danger-subtle text-danger-emphasis p-3 rounded-4 d-flex align-items-center justify-content-between gap-3 w-100"
-                        style={{ maxWidth: "85%" }}
-                      >
-                        <div className="d-flex align-items-center gap-2">
-                          <i className="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
-                          <div>
-                            <div className="fw-bold small">No se pudo obtener la respuesta.</div>
-                            <div className="small">Error al conectar al servidor.</div>
-                          </div>
-                        </div>
-                        {msg.originalQuestion && (
-                          <button
-                            type="button"
-                            onClick={() => enviarPregunta(msg.originalQuestion!)}
-                            className="btn btn-sm bg-white border rounded-3 fw-medium"
-                          >
-                            Reintentar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
+          {/* LISTA DE MENSAJES MÓVIL (100% ANCHO ÚTIL) */}
+          <div
+            ref={mobileChatContainerRef}
+            className="flex-grow-1 overflow-y-auto p-2 d-flex flex-column gap-2"
+            style={{ backgroundColor: "#f8fafc" }}
+          >
+            {activeConversation.messages.map((msg) => {
+              if (msg.role === "user") {
                 return (
-                  <div key={msg.id} className="d-flex justify-content-start">
+                  <div key={msg.id} className="d-flex justify-content-end">
                     <div
-                      className="bg-white border rounded-4 p-3 shadow-sm"
-                      style={{ maxWidth: "85%" }}
+                      className="rounded-4 px-3 py-2 text-white shadow-sm"
+                      style={{
+                        maxWidth: "85%",
+                        backgroundColor: "#18181b",
+                        fontSize: "0.9rem",
+                        lineHeight: "1.45",
+                        borderBottomRightRadius: "4px",
+                      }}
                     >
-                      <div className="text-dark mb-2">{renderizarTextoFormateado(msg.text)}</div>
-                      <div className="d-flex justify-content-between align-items-center pt-2 border-top">
-                        <div className="d-flex align-items-center gap-2">
-                          <span className="badge bg-success-subtle text-success rounded-pill">
-                            ● {msg.model || modelo}
-                          </span>
-                          {msg.tiempoMs !== undefined && (
-                            <small className="text-muted">
-                              <i className="bi bi-stopwatch me-1"></i>
-                              {(msg.tiempoMs / 1000).toFixed(2)}s
-                            </small>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => copiarTexto(msg.text)}
-                          className="btn btn-sm text-muted p-0 border-0"
-                          title="Copiar respuesta"
-                        >
-                          <i className="bi bi-clipboard"></i>
-                        </button>
-                      </div>
+                      {msg.text}
                     </div>
                   </div>
                 );
-              })}
+              }
 
-              {loading && (
-                <div className="d-flex justify-content-start">
-                  <div className="bg-white border rounded-4 px-3 py-2 shadow-sm text-muted small d-flex align-items-center gap-2">
-                    <div className="spinner-border spinner-border-sm text-warning" role="status" />
-                    <span>Consultando información y procesando respuesta...</span>
+              if (msg.error) {
+                return (
+                  <div key={msg.id} className="d-flex justify-content-start">
+                    <div
+                      className="rounded-4 p-3 border shadow-sm w-100"
+                      style={{
+                        backgroundColor: "#fef2f2",
+                        borderColor: "#fecaca",
+                        fontSize: "0.86rem",
+                      }}
+                    >
+                      <div className="d-flex align-items-center gap-2 text-danger fw-bold mb-1">
+                        <i className="bi bi-exclamation-triangle-fill"></i>
+                        <span>No se pudo conectar al servidor</span>
+                      </div>
+                      {msg.originalQuestion && (
+                        <button
+                          type="button"
+                          onClick={() => enviarPregunta(msg.originalQuestion!)}
+                          className="btn btn-sm btn-outline-danger rounded-pill px-3 mt-1"
+                        >
+                          <i className="bi bi-arrow-clockwise me-1"></i>
+                          Reintentar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={msg.id} className="d-flex justify-content-start">
+                  <div
+                    className="rounded-4 p-3 shadow-sm"
+                    style={{
+                      width: "94%",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e4e4e7",
+                      fontSize: "0.9rem",
+                      borderTopLeftRadius: "4px",
+                    }}
+                  >
+                    <div className="text-dark">{renderizarTextoFormateado(msg.text)}</div>
+                    <div className="d-flex align-items-center justify-content-between pt-2 mt-2 border-top">
+                      <span className="d-flex align-items-center gap-2">
+                        <span
+                          className="badge bg-success-subtle text-success rounded-pill"
+                          style={{ fontSize: "0.68rem" }}
+                        >
+                          ● {msg.model || modelo}
+                        </span>
+                        {msg.tiempoMs !== undefined && (
+                          <small className="text-muted" style={{ fontSize: "0.7rem" }}>
+                            {(msg.tiempoMs / 1000).toFixed(1)}s
+                          </small>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copiarTexto(msg.text)}
+                        className="btn btn-sm p-0 text-muted border-0"
+                        title="Copiar respuesta"
+                      >
+                        <i className="bi bi-clipboard"></i>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
+              );
+            })}
 
-            <div className="card-footer bg-white border-top p-3 rounded-bottom-4">
-              {escuchandoVoz && (
-                <div className="mb-2 px-3 py-1 rounded-3 bg-danger-subtle text-danger small d-flex align-items-center justify-content-between">
-                  <span>
-                    <i className="bi bi-mic-fill me-2"></i>
-                    <strong>Escuchando tu voz...</strong> Habla ahora y al terminar se enviará
-                    automáticamente.
-                  </span>
+            {loading && (
+              <div className="d-flex justify-content-start">
+                <div
+                  className="rounded-4 px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2"
+                  style={{ backgroundColor: "#ffffff", border: "1px solid #e4e4e7", fontSize: "0.85rem" }}
+                >
+                  <div className="spinner-border spinner-border-sm text-warning" role="status" />
+                  <span className="text-muted">Escribiendo respuesta...</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SUGERENCIAS DESLIZABLES EN MÓVIL */}
+          {soloBienvenida && !loading && (
+            <div
+              className="d-flex gap-2 px-2 py-2 overflow-x-auto border-top"
+              style={{ backgroundColor: "#ffffff", flexShrink: 0, whiteSpace: "nowrap" }}
+            >
+              {sugerencias.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => enviarPregunta(s)}
+                  className="btn btn-sm rounded-pill px-3 py-1 flex-shrink-0"
+                  style={{
+                    backgroundColor: "#f4f4f5",
+                    border: "1px solid #e4e4e7",
+                    fontSize: "0.76rem",
+                    color: "#27272a",
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* AVISO DE MICRÓFONO EN MÓVIL */}
+          {escuchandoVoz && (
+            <div
+              className="px-3 py-1 d-flex align-items-center justify-content-between"
+              style={{ backgroundColor: "#fef3c7", color: "#92400e", fontSize: "0.78rem", flexShrink: 0 }}
+            >
+              <span>
+                <i className="bi bi-mic-fill me-1 text-danger"></i>
+                <strong>Escuchando...</strong>
+              </span>
+              <button
+                type="button"
+                onClick={alternarDictadoPorVoz}
+                className="btn btn-sm btn-danger py-0 px-2 rounded-pill"
+                style={{ fontSize: "0.72rem" }}
+              >
+                Detener
+              </button>
+            </div>
+          )}
+
+          {/* CAJA DE TEXTO FIJA ABAJO (COMPOSER MÓVIL) */}
+          <div
+            className="p-2 border-top d-flex align-items-end gap-2"
+            style={{ backgroundColor: "#ffffff", flexShrink: 0 }}
+          >
+            <button
+              type="button"
+              disabled={loading}
+              onClick={alternarDictadoPorVoz}
+              className="btn d-flex align-items-center justify-content-center flex-shrink-0"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: "50%",
+                backgroundColor: escuchandoVoz ? "#fee2e2" : "#f4f4f5",
+                color: escuchandoVoz ? "#dc2626" : "#3f3f46",
+              }}
+              aria-label="Dictar por voz"
+            >
+              <i className={`bi ${escuchandoVoz ? "bi-mic-mute-fill" : "bi-mic-fill"}`}></i>
+            </button>
+
+            <textarea
+              ref={mobileTextareaRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Escribe tu mensaje o folio..."
+              className="form-control border-0 shadow-none"
+              style={{
+                backgroundColor: "#f4f4f5",
+                borderRadius: "18px",
+                fontSize: "0.9rem",
+                padding: "8px 14px",
+                resize: "none",
+                maxHeight: "100px",
+              }}
+            />
+
+            <button
+              type="button"
+              disabled={loading || !input.trim()}
+              onClick={() => enviarPregunta(input)}
+              className="btn d-flex align-items-center justify-content-center flex-shrink-0"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: "50%",
+                backgroundColor: !input.trim() || loading ? "#e4e4e7" : "#f59e0b",
+                color: "#18181b",
+              }}
+              aria-label="Enviar"
+            >
+              <i className="bi bi-send-fill"></i>
+            </button>
+          </div>
+        </div>
+
+        {/* DRAWER / HOJA INFERIOR PARA HISTORIAL EN CELULAR */}
+        {historialMovilAbierto && (
+          <div
+            className="modal-backdrop-custom d-flex align-items-end justify-content-center"
+            onClick={() => setHistorialMovilAbierto(false)}
+          >
+            <div
+              className="w-100 rounded-top-4 p-3 shadow-lg"
+              style={{
+                backgroundColor: "#ffffff",
+                maxHeight: "75dvh",
+                display: "flex",
+                flexDirection: "column",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                <div className="fw-bold d-flex align-items-center gap-2">
+                  <i className="bi bi-clock-history text-warning"></i>
+                  <span>Mis Consultas ({conversations.length})</span>
+                </div>
+                <div className="d-flex align-items-center gap-2">
                   <button
                     type="button"
-                    onClick={alternarDictadoPorVoz}
-                    className="btn btn-sm btn-danger py-0 px-2 rounded-2"
+                    onClick={handleNuevaConversacion}
+                    className="btn btn-sm fw-semibold rounded-pill px-3"
+                    style={{ backgroundColor: "#f59e0b", color: "#18181b", fontSize: "0.78rem" }}
                   >
-                    Detener
+                    + Nueva
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setHistorialMovilAbierto(false)}
+                  ></button>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto d-flex flex-column gap-2 py-1">
+                {conversations.map((conv, index) => {
+                  const esActiva = conv.id === activeConversation.id;
+                  return (
+                    <div
+                      key={conv.id}
+                      onClick={() => {
+                        setActiveConvId(conv.id);
+                        setHistorialMovilAbierto(false);
+                      }}
+                      className="p-2 rounded-3 d-flex align-items-center justify-content-between"
+                      style={{
+                        backgroundColor: esActiva ? "#fffbeb" : "#f8fafc",
+                        border: esActiva ? "1px solid #f59e0b" : "1px solid #e4e4e7",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div className="text-truncate me-2">
+                        <div className="fw-semibold small text-dark text-truncate">
+                          {conv.title}
+                        </div>
+                        <small className="text-muted" style={{ fontSize: "0.72rem" }}>
+                          Consulta #{conversations.length - index} · {conv.updatedAt}
+                        </small>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => solicitarEliminarConversacion(conv, e)}
+                        className="btn btn-sm text-danger border-0"
+                      >
+                        <i className="bi bi-trash3"></i>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* =========================================================================
+          2. VISTA DE TABLET Y ESCRITORIO (>= 768px) — TU DISEÑO ORIGINAL INTACTO
+         ========================================================================= */}
+
+      <div className="d-none d-md-block">
+        <div className="row g-4">
+          {/* ===================== PANEL LATERAL (.ia-sidebar) ===================== */}
+          <div className="col-lg-4 col-xl-3">
+            <aside className="ia-sidebar">
+              {/* Selector de Motor (.ia-engine-card) */}
+              <div className="luxury-card ia-engine-card">
+                <div className="ia-engine-top">
+                  <span className="ia-engine-label">
+                    <i className="bi bi-cpu"></i>
+                    Motor de IA
+                  </span>
+                  <span className="badge-soft badge-emerald">
+                    <span className="dot"></span> Activo
+                  </span>
+                </div>
+                <div className="ia-segment">
+                  <button
+                    type="button"
+                    className={`ia-segment-btn ${modelo === "gemini" ? "active" : ""}`}
+                    onClick={() => setModelo("gemini")}
+                  >
+                    <i className="bi bi-cloud"></i> Gemini
+                  </button>
+                  <button
+                    type="button"
+                    className={`ia-segment-btn ${modelo === "llama3.2:3b" ? "active" : ""}`}
+                    onClick={() => setModelo("llama3.2:3b")}
+                  >
+                    <i className="bi bi-pc-display"></i> Llama 3.2
+                  </button>
+                </div>
+              </div>
+
+              {/* Historial de Consultas */}
+              <div className="luxury-card p-3 d-flex flex-column gap-2" style={{ maxHeight: "calc(100dvh - 360px)" }}>
+                <div className="d-flex align-items-center justify-content-between pb-2 border-bottom">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="ia-engine-label">
+                      <i className="bi bi-clock-history"></i>
+                      <span>Mis Consultas</span>
+                    </div>
+                    <small className="text-muted d-block text-truncate" style={{ fontSize: "0.72rem" }}>
+                      {sesion?.nombre || "Tu sesión"}
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-luxury-primary py-1 px-2"
+                    style={{ fontSize: "0.78rem" }}
+                    onClick={handleNuevaConversacion}
+                  >
+                    <i className="bi bi-plus-lg"></i> Nueva
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto d-flex flex-column gap-2 pe-1">
+                  {conversations.map((conv, index) => {
+                    const esActiva = conv.id === activeConversation.id;
+                    return (
+                      <div
+                        key={conv.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setActiveConvId(conv.id)}
+                        className="p-2 rounded-3 d-flex align-items-center justify-content-between"
+                        style={{
+                          backgroundColor: esActiva ? "#fffbeb" : "#fafaf9",
+                          border: esActiva ? "1px solid #f59e0b" : "1px solid var(--border-subtle)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div className="text-truncate me-2">
+                          <div className="fw-semibold small text-dark text-truncate">{conv.title}</div>
+                          <small className="text-muted" style={{ fontSize: "0.72rem" }}>
+                            Consulta #{conversations.length - index} · {conv.updatedAt}
+                          </small>
+                        </div>
+                        <button
+                          type="button"
+                          className="action-icon-btn delete"
+                          onClick={(e) => solicitarEliminarConversacion(conv, e)}
+                          title="Eliminar conversación"
+                        >
+                          <i className="bi bi-trash3"></i>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          {/* ========================= CONSOLA DE CHAT (.ia-console) ========================= */}
+          <div className="col-lg-8 col-xl-9">
+            <section className="luxury-card ia-console">
+              <div className="luxury-card-header py-3">
+                <div className="d-flex align-items-center gap-3">
+                  <div className="ia-avatar">
+                    <i className="bi bi-stars"></i>
+                  </div>
+                  <div>
+                    <h6 className="fw-bold mb-0">Asistente de IA</h6>
+                    <small className="text-muted">
+                      {modelo === "gemini" ? "Google Gemini" : "Ollama Llama 3.2:3b"}
+                    </small>
+                  </div>
+                </div>
+
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className={`btn-luxury-outline py-1 px-3 ${fechasAbiertas ? "bg-warning-subtle border-warning" : ""}`}
+                    onClick={() => setFechasAbiertas((v) => !v)}
+                  >
+                    <i className="bi bi-calendar-check me-2 text-warning"></i>
+                    Fechas de estancia
+                  </button>
+                </div>
+              </div>
+
+              {fechasAbiertas && (
+                <div className="px-4 py-2 bg-warning-subtle border-bottom d-flex align-items-end gap-3 flex-wrap">
+                  <div>
+                    <label htmlFor="ia2-entrada" className="small fw-semibold d-block">Entrada</label>
+                    <input
+                      id="ia2-entrada"
+                      type="date"
+                      className="form-control form-control-sm"
+                      min={hoyIso}
+                      value={fechaEntrada}
+                      onChange={(e) => manejarCambioEntrada(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ia2-salida" className="small fw-semibold d-block">Salida</label>
+                    <input
+                      id="ia2-salida"
+                      type="date"
+                      className="form-control form-control-sm"
+                      min={obtenerFechaLocalIso(1, fechaEntrada)}
+                      value={fechaSalida}
+                      onChange={(e) => manejarCambioSalida(e.target.value)}
+                    />
+                  </div>
+                  <button type="button" className="btn-luxury-primary py-1 px-3" onClick={insertarFechasEnInput}>
+                    Usar fechas en consulta
                   </button>
                 </div>
               )}
 
-              <div className="d-flex gap-2 align-items-center">
+              {/* Hilo de mensajes (.ia-thread) */}
+              <div ref={chatContainerRef} className="ia-thread">
+                {activeConversation.messages.map((msg) => {
+                  if (msg.role === "user") {
+                    return (
+                      <div key={msg.id} className="ia-turn">
+                        <div className="ia-bubble-user">{msg.text}</div>
+                      </div>
+                    );
+                  }
+
+                  if (msg.error) {
+                    return (
+                      <div key={msg.id} className="ia-turn">
+                        <div className="ia-error justify-content-between">
+                          <div className="d-flex align-items-center gap-2">
+                            <i className="bi bi-exclamation-triangle-fill"></i>
+                            <div>
+                              <div className="fw-bold">No se pudo obtener la respuesta.</div>
+                              <div className="small">Error al conectar al servidor.</div>
+                            </div>
+                          </div>
+                          {msg.originalQuestion && (
+                            <button
+                              type="button"
+                              className="btn-luxury-outline py-1 px-3"
+                              onClick={() => enviarPregunta(msg.originalQuestion!)}
+                            >
+                              Reintentar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={msg.id} className="ia-turn">
+                      <div className="ia-bubble-ai">
+                        <div className="ia-markdown">{renderizarTextoFormateado(msg.text)}</div>
+                        <div className="ia-meta justify-content-between">
+                          <span className="d-flex align-items-center gap-2">
+                            <span className="badge-soft badge-emerald">
+                              <span className="dot"></span>
+                              {msg.model || modelo}
+                            </span>
+                            {msg.tiempoMs !== undefined && (
+                              <span className="ia-timer">
+                                <i className="bi bi-stopwatch me-1"></i>
+                                {(msg.tiempoMs / 1000).toFixed(2)}s
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            className="action-icon-btn"
+                            onClick={() => copiarTexto(msg.text)}
+                            title="Copiar"
+                          >
+                            <i className="bi bi-clipboard"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {loading && (
+                  <div className="ia-loading">
+                    <div className="ia-dots">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                    <span className="small text-muted">Procesando respuesta...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Sugerencias rápidas */}
+              {soloBienvenida && !loading && (
+                <div className="px-4 py-2 bg-white border-top d-flex gap-2 flex-wrap">
+                  {sugerencias.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="btn-luxury-outline py-1 px-3 rounded-pill"
+                      style={{ fontSize: "0.8rem" }}
+                      onClick={() => enviarPregunta(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Compositor (.ia-composer) */}
+              <div className="ia-composer">
                 <button
                   type="button"
                   disabled={loading}
                   onClick={alternarDictadoPorVoz}
-                  className={`btn rounded-3 px-3 py-2 d-flex align-items-center justify-content-center ${escuchandoVoz ? "btn-danger" : "btn-outline-dark"
-                    }`}
-                  title={
-                    escuchandoVoz
-                      ? "Detener dictado por voz"
-                      : "Presiona para hablar y enviar por voz"
-                  }
+                  className="btn-luxury-outline px-3"
+                  style={{ height: "44px" }}
+                  title="Dictar por voz"
                 >
-                  <i className={`bi ${escuchandoVoz ? "bi-mic-mute-fill" : "bi-mic-fill"}`}></i>
+                  <i className={`bi ${escuchandoVoz ? "bi-mic-mute-fill text-danger" : "bi-mic-fill"}`}></i>
                 </button>
 
                 <textarea
+                  ref={textareaRef}
                   rows={1}
+                  className="input-luxury"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Escribe o presiona el micrófono para hablar con el asistente..."
-                  className="form-control rounded-3"
-                  style={{ resize: "none" }}
+                  placeholder="Escribe tu pregunta..."
                 />
 
                 <button
                   type="button"
                   disabled={loading || !input.trim()}
                   onClick={() => enviarPregunta(input)}
-                  className="btn btn-dark px-4 py-2 rounded-3 d-flex align-items-center gap-2 fw-medium"
+                  className="btn-luxury-primary"
                 >
-                  <i className="bi bi-send-fill"></i> Preguntar
+                  <i className="bi bi-send-fill"></i>
+                  <span>Preguntar</span>
                 </button>
               </div>
-              <small className="text-muted d-block mt-1" style={{ fontSize: "0.75rem" }}>
-                Enter para enviar · Presiona <i className="bi bi-mic-fill"></i> para dictar por voz
-              </small>
-            </div>
+              <div className="ia-hint">
+                Enter para enviar · Shift+Enter para salto de línea · <i className="bi bi-mic-fill"></i> para dictar
+              </div>
+            </section>
           </div>
         </div>
       </div>
 
-      {/* MODAL DE CONFIRMACIÓN PARA ELIMINAR CHAT */}
+      {/* MODAL COMPARTIDO: ELIMINAR CHAT */}
       {chatAEliminar && (
-        <div
-          className="modal d-block"
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.55)", backdropFilter: "blur(2px)" }}
-          tabIndex={-1}
-        >
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: "400px" }}>
-            <div className="modal-content border-0 rounded-4 shadow-lg p-4 text-center">
-              <div className="mb-3">
-                <span
-                  className="d-inline-flex align-items-center justify-content-center rounded-circle"
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    border: "2px solid #dc2626",
-                    color: "#dc2626",
-                    fontSize: "1.4rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  !
-                </span>
+        <div className="modal-backdrop-custom" onClick={() => setChatAEliminar(null)}>
+          <div
+            className="modal-window"
+            style={{ maxWidth: 400 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-window-body text-center p-4">
+              <div className="mb-3 text-danger fs-1">
+                <i className="bi bi-exclamation-circle"></i>
               </div>
-              <h5 className="fw-bold text-dark mb-2">¿Eliminar conversación?</h5>
-              <p className="text-muted small mb-4">
+              <h5 className="fw-bold mb-2">¿Eliminar conversación?</h5>
+              <p className="text-muted small mb-0">
                 Se dará de baja del historial la consulta{" "}
                 <strong className="text-dark">"{chatAEliminar.title}"</strong>.
               </p>
-              <div className="border-top pt-3 d-flex justify-content-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setChatAEliminar(null)}
-                  className="btn btn-light border rounded-3 px-4 py-2 fw-medium"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmarEliminarConversacion}
-                  className="btn btn-danger rounded-3 px-4 py-2 fw-semibold"
-                  style={{ backgroundColor: "#dc2626" }}
-                >
-                  Sí, eliminar
-                </button>
-              </div>
+            </div>
+            <div className="modal-window-footer justify-content-center">
+              <button
+                type="button"
+                onClick={() => setChatAEliminar(null)}
+                className="btn-luxury-outline"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarEliminarConversacion}
+                className="btn btn-danger rounded-3 px-4"
+              >
+                Sí, eliminar
+              </button>
             </div>
           </div>
         </div>
