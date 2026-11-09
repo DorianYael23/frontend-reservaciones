@@ -713,77 +713,79 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
           </div>
         </div>
 
-        {/* BARRA DE BÚSQUEDA Y FILTROS RÁPIDOS */}
-        <div
-          className="px-3 px-md-4 py-3 border-bottom"
-          style={{ backgroundColor: "#fafaf9" }}
-        >
-          <div className="row g-2 align-items-center">
-            <div className="col-12 col-md-6">
-              <div className="login-input-wrap">
-                <i className="bi bi-search login-input-icon"></i>
-                <input
-                  type="text"
-                  className="input-luxury"
-                  placeholder="Buscar por folio (ej. R80015), huésped, teléfono, hab. o sede..."
-                  value={busqueda}
-                  onChange={(e) => {
-                    setBusqueda(e.target.value);
-                    setPaginaActual(1);
-                  }}
-                />
-                {busqueda && (
-                  <button
-                    type="button"
-                    className="login-eye"
-                    onClick={() => {
-                      setBusqueda("");
+        {/* BARRA DE BÚSQUEDA Y FILTROS RÁPIDOS (Solo Administrador y Recepcionista) */}
+        {esAdmin && (
+          <div
+            className="px-3 px-md-4 py-3 border-bottom"
+            style={{ backgroundColor: "#fafaf9" }}
+          >
+            <div className="row g-2 align-items-center">
+              <div className="col-12 col-md-6">
+                <div className="login-input-wrap">
+                  <i className="bi bi-search login-input-icon"></i>
+                  <input
+                    type="text"
+                    className="input-luxury"
+                    placeholder="Buscar por folio (ej. R80015), huésped, teléfono, hab. o sede..."
+                    value={busqueda}
+                    onChange={(e) => {
+                      setBusqueda(e.target.value);
                       setPaginaActual(1);
                     }}
-                    title="Limpiar búsqueda"
-                  >
-                    <i className="bi bi-x-lg"></i>
-                  </button>
-                )}
+                  />
+                  {busqueda && (
+                    <button
+                      type="button"
+                      className="login-eye"
+                      onClick={() => {
+                        setBusqueda("");
+                        setPaginaActual(1);
+                      }}
+                      title="Limpiar búsqueda"
+                    >
+                      <i className="bi bi-x-lg"></i>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="col-7 col-md-4">
+                <select
+                  className="input-luxury"
+                  value={filtroEstadoTabla}
+                  onChange={(e) => {
+                    setFiltroEstadoTabla(e.target.value);
+                    setPaginaActual(1);
+                  }}
+                >
+                  <option value="">Todos los estatus ({reservaciones.length})</option>
+                  <option value="Pendiente">Pendientes de Pago</option>
+                  <option value="Confirmada">Confirmadas (Por llegar)</option>
+                  <option value="En Curso">En Curso (En el hotel)</option>
+                  <option value="Finalizada">Finalizadas</option>
+                  <option value="Cancelada">Canceladas</option>
+                </select>
+              </div>
+
+              <div className="col-5 col-md-2">
+                <select
+                  className="input-luxury"
+                  value={registrosPorPagina}
+                  onChange={(e) => {
+                    setRegistrosPorPagina(Number(e.target.value));
+                    setPaginaActual(1);
+                  }}
+                  title="Registros por página"
+                >
+                  <option value={7}>7 / pág.</option>
+                  <option value={10}>10 / pág.</option>
+                  <option value={25}>25 / pág.</option>
+                  <option value={50}>50 / pág.</option>
+                </select>
               </div>
             </div>
-
-            <div className="col-7 col-md-4">
-              <select
-                className="input-luxury"
-                value={filtroEstadoTabla}
-                onChange={(e) => {
-                  setFiltroEstadoTabla(e.target.value);
-                  setPaginaActual(1);
-                }}
-              >
-                <option value="">Todos los estatus ({reservaciones.length})</option>
-                <option value="Pendiente">Pendientes de Pago</option>
-                <option value="Confirmada">Confirmadas (Por llegar)</option>
-                <option value="En Curso">En Curso (En el hotel)</option>
-                <option value="Finalizada">Finalizadas</option>
-                <option value="Cancelada">Canceladas</option>
-              </select>
-            </div>
-
-            <div className="col-5 col-md-2">
-              <select
-                className="input-luxury"
-                value={registrosPorPagina}
-                onChange={(e) => {
-                  setRegistrosPorPagina(Number(e.target.value));
-                  setPaginaActual(1);
-                }}
-                title="Registros por página"
-              >
-                <option value={7}>7 / pág.</option>
-                <option value={10}>10 / pág.</option>
-                <option value={25}>25 / pág.</option>
-                <option value={50}>50 / pág.</option>
-              </select>
-            </div>
           </div>
-        </div>
+        )}
 
         {/* VISTA DE CELULAR (< 768px) */}
         <div className="d-md-none p-2">
