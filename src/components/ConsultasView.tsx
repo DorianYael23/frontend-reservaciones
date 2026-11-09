@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Hotel, TipoHabitacion } from '../types';
 import {
+    API_URL, // <-- Lo traemos de tu archivo central
     consultarDisponibles,
     consultarDistribucion,
     consultarConteoDisponibles,
@@ -8,9 +9,143 @@ import {
     obtenerTipos,
 } from '../services/api';
 
-const hostActual = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-const API_BASE = (import.meta as any).env?.VITE_API_URL || `http://${hostActual}:8082/api`;
-const API_RESERVACIONES = `${API_BASE}/reservaciones`;
+const API_RESERVACIONES = `${API_URL}/reservaciones`;
+
+// Estilos exclusivos del dashboard (prefijo "wow-" para no chocar con tu CSS actual)
+const estilosWow = `
+@keyframes wowFade { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes wowGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes wowGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes wowSheen { 0% { transform: translateX(-120%); } 60%, 100% { transform: translateX(260%); } }
+@keyframes wowPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); } 50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); } }
+@keyframes wowDraw { from { stroke-dashoffset: 400; } to { stroke-dashoffset: 0; } }
+
+.wow-fade { animation: wowFade .65s cubic-bezier(.2,.7,.2,1) both; }
+
+.wow-card {
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+.wow-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 40px -18px rgba(24, 24, 27, 0.35) !important;
+    border-color: rgba(217, 119, 6, 0.35) !important;
+}
+
+.wow-panel {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, #ffffff 0%, #fdfcfa 100%) !important;
+}
+.wow-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #f59e0b, #d97706, #8b5cf6, #0284c7, #10b981);
+    opacity: .9;
+}
+
+.wow-kpi {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+}
+.wow-kpi::after {
+    content: '';
+    position: absolute;
+    right: -30px; top: -30px;
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.18), transparent 70%);
+    pointer-events: none;
+}
+.wow-kpi-dark {
+    background: linear-gradient(135deg, #18181b 0%, #27272a 55%, #3f3f46 100%) !important;
+    border: 1px solid rgba(245, 158, 11, 0.35) !important;
+    color: #fafaf9;
+}
+.wow-kpi-dark::after {
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.35), transparent 70%);
+}
+.wow-kpi-accent-emerald { border-top: 3px solid #10b981 !important; }
+.wow-kpi-accent-amber { border-top: 3px solid #f59e0b !important; }
+.wow-kpi-accent-rose { border-top: 3px solid #e11d48 !important; }
+
+.wow-gold-text {
+    background: linear-gradient(90deg, #fbbf24, #f59e0b, #fde68a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.wow-hbar {
+    position: relative;
+    overflow: hidden;
+    transform-origin: left center;
+    animation: wowGrowX .9s cubic-bezier(.2,.7,.2,1) both;
+}
+.wow-hbar::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 40%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+    animation: wowSheen 3.2s ease-in-out infinite;
+}
+
+.wow-vbar {
+    transform-origin: bottom center;
+    animation: wowGrowY .85s cubic-bezier(.2,.7,.2,1) both;
+    transition: filter .2s ease, transform .2s ease;
+}
+.wow-vcol:hover .wow-vbar { filter: brightness(1.12) saturate(1.2); }
+
+.wow-grid-bg {
+    background-image: repeating-linear-gradient(to top, rgba(24,24,27,.06) 0, rgba(24,24,27,.06) 1px, transparent 1px, transparent 36px);
+}
+
+.wow-star {
+    animation: wowPulse 2.2s ease-in-out infinite;
+}
+
+.wow-insight {
+    border-radius: 1rem;
+    padding: 1rem 1.1rem;
+    background: linear-gradient(135deg, #fffbeb 0%, #ffffff 70%);
+    border: 1px solid #fde68a;
+    height: 100%;
+}
+.wow-insight-label {
+    font-size: .68rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: #a16207;
+    font-weight: 700;
+}
+
+.wow-cat-rank {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .75rem;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.wow-donut-seg {
+    transition: stroke-width .2s ease;
+    animation: wowDraw 1.2s ease both;
+}
+.wow-donut-seg:hover { stroke-width: 15; }
+
+@media (prefers-reduced-motion: reduce) {
+    .wow-fade, .wow-hbar, .wow-vbar, .wow-star, .wow-hbar::after, .wow-donut-seg { animation: none !important; }
+    .wow-card { transition: none; }
+}
+`;
 
 export default function ConsultasView() {
     const [vistaReporte, setVistaReporte] = useState<'dashboard' | 'recepcion' | 'matriz' | 'resumen'>('dashboard');
@@ -165,8 +300,47 @@ export default function ConsultasView() {
     })();
     const maxCatIngresos = Math.max(1, ...datosCategorias.map((d) => d.ingresos));
 
+    // ---- Solo presentación (derivados visuales, no alteran la lógica anterior) ----
+    const mejorAnio = datosAnuales.reduce(
+        (best, d) => (d.reservas > best.reservas ? d : best),
+        { anio: '', reservas: 0, ingresos: 0 }
+    );
+    const mesPico = datosMensuales.reduce(
+        (best, d) => (d.reservas > best.reservas ? d : best),
+        { mesNombre: '', reservas: 0, ingresos: 0, esTemporadaAlta: false }
+    );
+    const catLider = datosCategorias.reduce(
+        (best, d) => (d.ingresos > best.ingresos ? d : best),
+        { nombre: '', reservas: 0, ingresos: 0, color: '#10b981' }
+    );
+    const tasaCancelacion =
+        reservasFiltradasDash.length > 0
+            ? (reservasCanceladas.length / reservasFiltradasDash.length) * 100
+            : 0;
+
+    const maxIngresoMes = Math.max(1, ...datosMensuales.map((d) => d.ingresos));
+    const sparkLinea = datosMensuales
+        .map((m, i) => `${((i / 11) * 120).toFixed(1)},${(34 - (m.ingresos / maxIngresoMes) * 30).toFixed(1)}`)
+        .join(' ');
+    const sparkArea = `M0,36 L${sparkLinea.split(' ').join(' L')} L120,36 Z`;
+
+    const RADIO_DONUT = 42;
+    const CIRC_DONUT = 2 * Math.PI * RADIO_DONUT;
+    const segmentosDonut = (() => {
+        const total = reservasEfectivas.length;
+        let acumulado = 0;
+        return datosTemporadas.map((t) => {
+            const largo = total > 0 ? (t.reservas / total) * CIRC_DONUT : 0;
+            const seg = { color: t.color, largo, offset: -acumulado, etiqueta: t.etiqueta, reservas: t.reservas };
+            acumulado += largo;
+            return seg;
+        });
+    })();
+
     return (
         <div className="luxury-card">
+            <style>{estilosWow}</style>
+
             <div className="luxury-card-header">
                 <div className="nav-pills-luxury">
                     <button
@@ -210,7 +384,10 @@ export default function ConsultasView() {
 
                 {vistaReporte === 'dashboard' && (
                     <div>
-                        <div className="row g-3 mb-4 p-3 rounded-4 border" style={{ backgroundColor: '#fafaf9' }}>
+                        <div
+                            className="row g-3 mb-4 p-3 rounded-4 border wow-fade"
+                            style={{ backgroundColor: '#fafaf9' }}
+                        >
                             <div className="col-md-5">
                                 <label className="input-label">Filtrar por Sede Hotelera</label>
                                 <select
@@ -255,57 +432,114 @@ export default function ConsultasView() {
                             </div>
                         </div>
 
+                        {/* ===== KPIs ===== */}
                         <div className="row g-3 mb-4">
                             <div className="col-12 col-sm-6 col-xl-3">
-                                <div className="stat-box d-flex justify-content-between align-items-center h-100">
-                                    <div>
-                                        <div className="text-muted small fw-medium">Ingresos Efectivos</div>
-                                        <h4 className="fw-bold mb-0 mt-1" style={{ color: '#065f46' }}>
+                                <div
+                                    className="stat-box wow-kpi wow-kpi-dark wow-card wow-fade d-flex justify-content-between align-items-center h-100"
+                                    style={{ animationDelay: '0.05s' }}
+                                >
+                                    <div style={{ position: 'relative', zIndex: 1 }}>
+                                        <div className="small fw-medium" style={{ color: '#d6d3d1' }}>
+                                            Ingresos Efectivos
+                                        </div>
+                                        <h4 className="fw-bold mb-0 mt-1 wow-gold-text" style={{ fontSize: '1.6rem' }}>
                                             {formatoMonedaCompacto(ingresosTotales)}
                                         </h4>
-                                        <small className="text-muted">Sin contar cancelaciones</small>
+                                        <small style={{ color: '#a8a29e' }}>Sin contar cancelaciones</small>
+                                        <svg
+                                            viewBox="0 0 120 36"
+                                            width="120"
+                                            height="36"
+                                            className="d-block mt-2"
+                                            aria-hidden="true"
+                                        >
+                                            <defs>
+                                                <linearGradient id="wowSparkFill" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.45" />
+                                                    <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+                                                </linearGradient>
+                                            </defs>
+                                            <path d={sparkArea} fill="url(#wowSparkFill)" />
+                                            <polyline
+                                                points={sparkLinea}
+                                                fill="none"
+                                                stroke="#fbbf24"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeDasharray="400"
+                                                style={{ animation: 'wowDraw 1.4s ease both' }}
+                                            />
+                                        </svg>
                                     </div>
-                                    <div className="brand-badge">
+                                    <div className="brand-badge" style={{ position: 'relative', zIndex: 1 }}>
                                         <i className="bi bi-cash-stack"></i>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="col-12 col-sm-6 col-xl-3">
-                                <div className="stat-box d-flex justify-content-between align-items-center h-100">
-                                    <div>
+                                <div
+                                    className="stat-box wow-kpi wow-kpi-accent-emerald wow-card wow-fade d-flex justify-content-between align-items-center h-100"
+                                    style={{ animationDelay: '0.15s' }}
+                                >
+                                    <div style={{ position: 'relative', zIndex: 1 }}>
                                         <div className="text-muted small fw-medium">Reservaciones Efectivas</div>
-                                        <h4 className="fw-bold mb-0 mt-1">{reservasEfectivas.length}</h4>
+                                        <h4 className="fw-bold mb-0 mt-1" style={{ fontSize: '1.6rem' }}>
+                                            {reservasEfectivas.length}
+                                        </h4>
                                         <small className="text-muted">
                                             De {reservasFiltradasDash.length} registradas
                                         </small>
+                                        <div
+                                            className="mt-2 rounded-pill overflow-hidden"
+                                            style={{ height: '5px', background: '#e7e5e4', maxWidth: '130px' }}
+                                        >
+                                            <div
+                                                className="h-100 rounded-pill wow-hbar"
+                                                style={{
+                                                    width: `${reservasFiltradasDash.length > 0 ? (reservasEfectivas.length / reservasFiltradasDash.length) * 100 : 0}%`,
+                                                    background: 'linear-gradient(90deg, #10b981, #34d399)',
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="brand-badge">
+                                    <div className="brand-badge" style={{ position: 'relative', zIndex: 1 }}>
                                         <i className="bi bi-calendar2-check"></i>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="col-12 col-sm-6 col-xl-3">
-                                <div className="stat-box d-flex justify-content-between align-items-center h-100">
-                                    <div>
+                                <div
+                                    className="stat-box wow-kpi wow-kpi-accent-amber wow-card wow-fade d-flex justify-content-between align-items-center h-100"
+                                    style={{ animationDelay: '0.25s' }}
+                                >
+                                    <div style={{ position: 'relative', zIndex: 1 }}>
                                         <div className="text-muted small fw-medium">Ticket Promedio</div>
-                                        <h4 className="fw-bold mb-0 mt-1">
+                                        <h4 className="fw-bold mb-0 mt-1" style={{ fontSize: '1.6rem' }}>
                                             {formatoMonedaCompacto(ticketPromedio)}
                                         </h4>
                                         <small className="text-muted">Promedio por estancia</small>
                                     </div>
-                                    <div className="brand-badge">
+                                    <div className="brand-badge" style={{ position: 'relative', zIndex: 1 }}>
                                         <i className="bi bi-receipt"></i>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="col-12 col-sm-6 col-xl-3">
-                                <div className="stat-box d-flex justify-content-between align-items-center h-100">
-                                    <div>
+                                <div
+                                    className="stat-box wow-kpi wow-kpi-accent-rose wow-card wow-fade d-flex justify-content-between align-items-center h-100"
+                                    style={{ animationDelay: '0.35s' }}
+                                >
+                                    <div style={{ position: 'relative', zIndex: 1 }}>
                                         <div className="text-muted small fw-medium">Cancelaciones</div>
-                                        <h4 className="fw-bold mb-0 mt-1 text-danger">
+                                        <h4
+                                            className="fw-bold mb-0 mt-1 text-danger"
+                                            style={{ fontSize: '1.6rem' }}
+                                        >
                                             {reservasCanceladas.length}
                                         </h4>
                                         <small className="text-muted">
@@ -313,17 +547,82 @@ export default function ConsultasView() {
                                                 ? `${((reservasCanceladas.length / reservasFiltradasDash.length) * 100).toFixed(1)}% del total`
                                                 : '0% del total'}
                                         </small>
+                                        <div
+                                            className="mt-2 rounded-pill overflow-hidden"
+                                            style={{ height: '5px', background: '#e7e5e4', maxWidth: '130px' }}
+                                        >
+                                            <div
+                                                className="h-100 rounded-pill wow-hbar"
+                                                style={{
+                                                    width: `${tasaCancelacion}%`,
+                                                    background: 'linear-gradient(90deg, #e11d48, #fb7185)',
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="brand-badge">
+                                    <div className="brand-badge" style={{ position: 'relative', zIndex: 1 }}>
                                         <i className="bi bi-x-octagon"></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        {/* ===== Insights rápidos ===== */}
+                        <div className="row g-3 mb-4">
+                            <div className="col-12 col-md-4">
+                                <div className="wow-insight wow-card wow-fade" style={{ animationDelay: '0.4s' }}>
+                                    <div className="wow-insight-label">
+                                        <i className="bi bi-trophy-fill me-1"></i> Mejor año
+                                    </div>
+                                    <div className="fw-bold fs-5 mt-1">
+                                        {mejorAnio.reservas > 0 ? mejorAnio.anio : '—'}
+                                    </div>
+                                    <small className="text-muted">
+                                        {mejorAnio.reservas > 0
+                                            ? `${mejorAnio.reservas} estancias · ${formatoMonedaCompacto(mejorAnio.ingresos)}`
+                                            : 'Sin datos en el filtro actual'}
+                                    </small>
+                                </div>
+                            </div>
+                            <div className="col-12 col-md-4">
+                                <div className="wow-insight wow-card wow-fade" style={{ animationDelay: '0.48s' }}>
+                                    <div className="wow-insight-label">
+                                        <i className="bi bi-lightning-charge-fill me-1"></i> Mes pico
+                                    </div>
+                                    <div className="fw-bold fs-5 mt-1">
+                                        {mesPico.reservas > 0 ? mesPico.mesNombre : '—'}
+                                    </div>
+                                    <small className="text-muted">
+                                        {mesPico.reservas > 0
+                                            ? `${mesPico.reservas} reservaciones · ${formatoMonedaCompacto(mesPico.ingresos)}`
+                                            : 'Sin datos en el filtro actual'}
+                                    </small>
+                                </div>
+                            </div>
+                            <div className="col-12 col-md-4">
+                                <div className="wow-insight wow-card wow-fade" style={{ animationDelay: '0.56s' }}>
+                                    <div className="wow-insight-label">
+                                        <i className="bi bi-gem me-1"></i> Categoría líder
+                                    </div>
+                                    <div className="fw-bold fs-5 mt-1">
+                                        {catLider.ingresos > 0 ? catLider.nombre : '—'}
+                                    </div>
+                                    <small className="text-muted">
+                                        {catLider.ingresos > 0
+                                            ? `${formatoMonedaCompacto(catLider.ingresos)} en ingresos`
+                                            : 'Sin datos en el filtro actual'}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="row g-4">
+                            {/* ===== Temporadas ===== */}
                             <div className="col-12 col-lg-6">
-                                <div className="p-4 rounded-4 border h-100 bg-white shadow-sm">
+                                <div
+                                    className="p-4 rounded-4 border h-100 bg-white shadow-sm wow-panel wow-card wow-fade"
+                                    style={{ animationDelay: '0.2s' }}
+                                >
                                     <div className="d-flex justify-content-between align-items-center mb-3">
                                         <div>
                                             <h6 className="fw-bold mb-0">
@@ -335,6 +634,62 @@ export default function ConsultasView() {
                                             </small>
                                         </div>
                                         <span className="badge-soft badge-amber">Estacionalidad</span>
+                                    </div>
+
+                                    <div className="d-flex justify-content-center my-3">
+                                        <svg
+                                            viewBox="0 0 120 120"
+                                            width="150"
+                                            height="150"
+                                            role="img"
+                                            aria-label="Distribución de reservaciones por temporada"
+                                        >
+                                            <circle
+                                                cx="60"
+                                                cy="60"
+                                                r={RADIO_DONUT}
+                                                fill="none"
+                                                stroke="#f5f5f4"
+                                                strokeWidth="12"
+                                            />
+                                            <g transform="rotate(-90 60 60)">
+                                                {segmentosDonut.map((s, i) =>
+                                                    s.largo > 0 ? (
+                                                        <circle
+                                                            key={i}
+                                                            className="wow-donut-seg"
+                                                            cx="60"
+                                                            cy="60"
+                                                            r={RADIO_DONUT}
+                                                            fill="none"
+                                                            stroke={s.color}
+                                                            strokeWidth="12"
+                                                            strokeDasharray={`${Math.max(0, s.largo - 1.5)} ${CIRC_DONUT}`}
+                                                            strokeDashoffset={s.offset}
+                                                            strokeLinecap="butt"
+                                                        >
+                                                            <title>{`${s.etiqueta}: ${s.reservas} res.`}</title>
+                                                        </circle>
+                                                    ) : null
+                                                )}
+                                            </g>
+                                            <text
+                                                x="60"
+                                                y="58"
+                                                textAnchor="middle"
+                                                style={{ fontSize: '20px', fontWeight: 800, fill: '#18181b' }}
+                                            >
+                                                {reservasEfectivas.length}
+                                            </text>
+                                            <text
+                                                x="60"
+                                                y="74"
+                                                textAnchor="middle"
+                                                style={{ fontSize: '8px', fill: '#78716c', letterSpacing: '0.08em' }}
+                                            >
+                                                ESTANCIAS
+                                            </text>
+                                        </svg>
                                     </div>
 
                                     <div className="d-flex flex-column gap-3 mt-3">
@@ -350,7 +705,17 @@ export default function ConsultasView() {
                                             return (
                                                 <div key={idx}>
                                                     <div className="d-flex justify-content-between small mb-1">
-                                                        <span className="fw-semibold text-dark">{t.etiqueta}</span>
+                                                        <span className="fw-semibold text-dark">
+                                                            <span
+                                                                className="d-inline-block rounded-circle me-2"
+                                                                style={{
+                                                                    width: '9px',
+                                                                    height: '9px',
+                                                                    backgroundColor: t.color,
+                                                                }}
+                                                            />
+                                                            {t.etiqueta}
+                                                        </span>
                                                         <span className="text-muted">
                                                             <strong>{t.reservas}</strong> res. ({pctTotal}%) ·{' '}
                                                             <strong style={{ color: '#065f46' }}>
@@ -363,10 +728,12 @@ export default function ConsultasView() {
                                                         style={{ height: '12px' }}
                                                     >
                                                         <div
-                                                            className="h-100 rounded-pill"
+                                                            className="h-100 rounded-pill wow-hbar"
                                                             style={{
                                                                 width: `${pctBarra}%`,
-                                                                backgroundColor: t.color,
+                                                                background: `linear-gradient(90deg, ${t.color}, ${t.color}cc)`,
+                                                                boxShadow: `0 0 12px ${t.color}66`,
+                                                                animationDelay: `${0.1 * idx}s`,
                                                                 transition: 'width 0.4s ease',
                                                             }}
                                                         />
@@ -378,8 +745,12 @@ export default function ConsultasView() {
                                 </div>
                             </div>
 
+                            {/* ===== Evolución anual ===== */}
                             <div className="col-12 col-lg-6">
-                                <div className="p-4 rounded-4 border h-100 bg-white shadow-sm d-flex flex-column justify-content-between">
+                                <div
+                                    className="p-4 rounded-4 border h-100 bg-white shadow-sm d-flex flex-column justify-content-between wow-panel wow-card wow-fade"
+                                    style={{ animationDelay: '0.3s' }}
+                                >
                                     <div className="d-flex justify-content-between align-items-center mb-3">
                                         <div>
                                             <h6 className="fw-bold mb-0">
@@ -394,7 +765,7 @@ export default function ConsultasView() {
                                     </div>
 
                                     <div
-                                        className="d-flex align-items-end justify-content-between gap-2 pt-4 pb-2 px-2 border-bottom"
+                                        className="d-flex align-items-end justify-content-between gap-2 pt-4 pb-2 px-2 border-bottom wow-grid-bg"
                                         style={{ height: '220px' }}
                                     >
                                         {datosAnuales.map((d, idx) => {
@@ -403,10 +774,11 @@ export default function ConsultasView() {
                                                 Math.round((d.reservas / maxAnioReservas) * 145)
                                             );
                                             const activo = filtroAnioDash === d.anio;
+                                            const esMejor = mejorAnio.reservas > 0 && d.anio === mejorAnio.anio;
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className="d-flex flex-column align-items-center flex-fill"
+                                                    className="d-flex flex-column align-items-center flex-fill wow-vcol"
                                                     style={{ cursor: 'pointer' }}
                                                     onClick={() =>
                                                         setFiltroAnioDash(activo ? '' : d.anio)
@@ -417,20 +789,32 @@ export default function ConsultasView() {
                                                         className="fw-bold text-dark mb-1"
                                                         style={{ fontSize: '0.75rem' }}
                                                     >
+                                                        {esMejor && (
+                                                            <i
+                                                                className="bi bi-star-fill me-1"
+                                                                style={{ color: '#f59e0b', fontSize: '0.65rem' }}
+                                                            ></i>
+                                                        )}
                                                         {d.reservas}
                                                     </span>
                                                     <div
-                                                        className="w-100 rounded-top-3"
+                                                        className={`w-100 rounded-top-3 wow-vbar ${activo || esMejor ? 'wow-star' : ''}`}
                                                         style={{
                                                             maxWidth: '42px',
                                                             height: `${alturaPx}px`,
                                                             background: activo
-                                                                ? '#d97706'
-                                                                : 'linear-gradient(180deg, #18181b 0%, #3f3f46 100%)',
+                                                                ? 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)'
+                                                                : esMejor
+                                                                    ? 'linear-gradient(180deg, #27272a 0%, #d97706 140%)'
+                                                                    : 'linear-gradient(180deg, #18181b 0%, #3f3f46 100%)',
+                                                            animationDelay: `${0.07 * idx}s`,
                                                             transition: 'height 0.4s ease',
                                                         }}
                                                     />
-                                                    <span className="small fw-semibold text-muted mt-2">
+                                                    <span
+                                                        className="small fw-semibold mt-2"
+                                                        style={{ color: activo ? '#d97706' : '#78716c' }}
+                                                    >
                                                         {d.anio}
                                                     </span>
                                                 </div>
@@ -446,8 +830,12 @@ export default function ConsultasView() {
                                 </div>
                             </div>
 
+                            {/* ===== Mensual ===== */}
                             <div className="col-12 col-lg-7">
-                                <div className="p-4 rounded-4 border h-100 bg-white shadow-sm d-flex flex-column justify-content-between">
+                                <div
+                                    className="p-4 rounded-4 border h-100 bg-white shadow-sm d-flex flex-column justify-content-between wow-panel wow-card wow-fade"
+                                    style={{ animationDelay: '0.4s' }}
+                                >
                                     <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                                         <div>
                                             <h6 className="fw-bold mb-0">
@@ -465,7 +853,7 @@ export default function ConsultasView() {
                                     </div>
 
                                     <div
-                                        className="d-flex align-items-end justify-content-between gap-1 pt-4 pb-2 px-1 border-bottom"
+                                        className="d-flex align-items-end justify-content-between gap-1 pt-4 pb-2 px-1 border-bottom wow-grid-bg"
                                         style={{ height: '210px' }}
                                     >
                                         {datosMensuales.map((m, idx) => {
@@ -473,10 +861,11 @@ export default function ConsultasView() {
                                                 12,
                                                 Math.round((m.reservas / maxMesReservas) * 140)
                                             );
+                                            const esPico = mesPico.reservas > 0 && m.mesNombre === mesPico.mesNombre;
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className="d-flex flex-column align-items-center flex-fill"
+                                                    className="d-flex flex-column align-items-center flex-fill wow-vcol"
                                                     title={`${m.mesNombre}: ${m.reservas} reservaciones (${formatoMonedaCompacto(m.ingresos)})`}
                                                 >
                                                     <span
@@ -486,19 +875,23 @@ export default function ConsultasView() {
                                                         {m.reservas}
                                                     </span>
                                                     <div
-                                                        className="w-100 rounded-top-2"
+                                                        className={`w-100 rounded-top-2 wow-vbar ${esPico ? 'wow-star' : ''}`}
                                                         style={{
                                                             maxWidth: '28px',
                                                             height: `${alturaPx}px`,
-                                                            backgroundColor: m.esTemporadaAlta
-                                                                ? '#f59e0b'
-                                                                : '#64748b',
+                                                            background: m.esTemporadaAlta
+                                                                ? 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)'
+                                                                : 'linear-gradient(180deg, #94a3b8 0%, #475569 100%)',
+                                                            animationDelay: `${0.05 * idx}s`,
                                                             transition: 'height 0.4s ease',
                                                         }}
                                                     />
                                                     <span
-                                                        className="text-muted fw-medium mt-2"
-                                                        style={{ fontSize: '0.72rem' }}
+                                                        className="fw-medium mt-2"
+                                                        style={{
+                                                            fontSize: '0.72rem',
+                                                            color: m.esTemporadaAlta ? '#b45309' : '#78716c',
+                                                        }}
                                                     >
                                                         {m.mesNombre}
                                                     </span>
@@ -512,8 +905,12 @@ export default function ConsultasView() {
                                 </div>
                             </div>
 
+                            {/* ===== Categorías ===== */}
                             <div className="col-12 col-lg-5">
-                                <div className="p-4 rounded-4 border h-100 bg-white shadow-sm">
+                                <div
+                                    className="p-4 rounded-4 border h-100 bg-white shadow-sm wow-panel wow-card wow-fade"
+                                    style={{ animationDelay: '0.5s' }}
+                                >
                                     <div className="d-flex justify-content-between align-items-center mb-3">
                                         <div>
                                             <h6 className="fw-bold mb-0">
@@ -538,9 +935,21 @@ export default function ConsultasView() {
                                                     ? ((cat.ingresos / ingresosTotales) * 100).toFixed(1)
                                                     : '0.0';
                                             return (
-                                                <div key={idx} className="p-3 rounded-3 border bg-light">
+                                                <div
+                                                    key={idx}
+                                                    className="p-3 rounded-3 border bg-light wow-card"
+                                                    style={{ borderLeft: `4px solid ${cat.color}` }}
+                                                >
                                                     <div className="d-flex justify-content-between align-items-center mb-1">
-                                                        <span className="fw-bold text-dark">{cat.nombre}</span>
+                                                        <span className="fw-bold text-dark d-flex align-items-center gap-2">
+                                                            <span
+                                                                className="wow-cat-rank"
+                                                                style={{ background: cat.color }}
+                                                            >
+                                                                {idx + 1}
+                                                            </span>
+                                                            {cat.nombre}
+                                                        </span>
                                                         <span
                                                             className="fw-bold"
                                                             style={{ color: '#065f46' }}
@@ -557,10 +966,12 @@ export default function ConsultasView() {
                                                         style={{ height: '10px' }}
                                                     >
                                                         <div
-                                                            className="h-100 rounded-pill"
+                                                            className="h-100 rounded-pill wow-hbar"
                                                             style={{
                                                                 width: `${pctAncho}%`,
-                                                                backgroundColor: cat.color,
+                                                                background: `linear-gradient(90deg, ${cat.color}, ${cat.color}bb)`,
+                                                                boxShadow: `0 0 10px ${cat.color}55`,
+                                                                animationDelay: `${0.12 * idx}s`,
                                                                 transition: 'width 0.4s ease',
                                                             }}
                                                         />
@@ -694,7 +1105,10 @@ export default function ConsultasView() {
                     <div className="row g-3">
                         {conteo.map((item, idx) => (
                             <div className="col-md-6" key={idx}>
-                                <div className="stat-box d-flex justify-content-between align-items-center">
+                                <div
+                                    className="stat-box wow-card wow-fade d-flex justify-content-between align-items-center"
+                                    style={{ animationDelay: `${0.08 * idx}s` }}
+                                >
                                     <div>
                                         <span className="badge-soft badge-emerald mb-2">Propiedad Activa</span>
                                         <h5 className="fw-bold mb-0">{item.hotel}</h5>

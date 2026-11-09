@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { type SesionUsuario } from "./LoginView";
+import { API_URL } from "../services/api";
 
 interface Hotel {
   id_hotel: number;
@@ -53,12 +54,9 @@ interface ReservacionesCrudProps {
   sesion?: SesionUsuario | null;
 }
 
-const hostActual = typeof window !== "undefined" ? window.location.hostname : "localhost";
-const API_BASE = (import.meta as any).env?.VITE_API_URL || `http://${hostActual}:8082/api`;
-
-const API_RESERVACIONES = `${API_BASE}/reservaciones`;
-const API_HABITACIONES = `${API_BASE}/habitaciones`;
-const API_TIPOS = `${API_BASE}/tipos-habitacion`;
+const API_RESERVACIONES = `${API_URL}/reservaciones`;
+const API_HABITACIONES = `${API_URL}/habitaciones`;
+const API_TIPOS = `${API_URL}/tipos-habitacion`;
 
 const obtenerFechaLocalIso = (diasSumar = 0, fechaBase?: string): string => {
   const base = fechaBase ? new Date(fechaBase + "T00:00:00") : new Date();
@@ -81,9 +79,12 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
-  // Paginación
+  // Paginación y Búsqueda
   const [paginaActual, setPaginaActual] = useState(1);
-  const registrosPorPagina = 7;
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroEstadoTabla, setFiltroEstadoTabla] = useState<string>("");
+  const [saltoPaginaInput, setSaltoPaginaInput] = useState("");
 
   // Notificaciones flotantes
   const [exito, setExito] = useState<string | null>(null);
@@ -442,7 +443,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
 
       setExito(
         data.mensaje ||
-          "¡Pago procesado con éxito! Reservación confirmada y ticket enviado al correo."
+        "¡Pago procesado con éxito! Reservación confirmada y ticket enviado al correo."
       );
       setReservacionAPagar(null);
       setNumTarjeta("");
@@ -512,18 +513,66 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
   ).length;
   const totalEnCurso = reservaciones.filter((r) => r.estado === "En Curso").length;
 
-  // Ordenar de la más reciente a la más antigua y paginar
-  const reservacionesOrdenadas = [...reservaciones].sort(
+  // Filtrar por buscador y estatus, ordenar de la más reciente a la más antigua y paginar
+  const terminoLimpio = busqueda.trim().toLowerCase();
+
+  const reservacionesFiltradas = reservaciones.filter((r) => {
+    const cumpleEstado = filtroEstadoTabla ? r.estado === filtroEstadoTabla : true;
+    if (!cumpleEstado) return false;
+    if (!terminoLimpio) return true;
+
+    const codigoFolio = (r.folio || `R${10000 + (r.id_reservacion || 0)}`).toLowerCase();
+    const cliente = (r.nombre_cliente || "").toLowerCase();
+    const tel = (r.telefono || "").toLowerCase();
+    const correo = (r.email || "").toLowerCase();
+    const numHab = String(r.habitacion?.numero || "").toLowerCase();
+    const hotelNombre = (r.habitacion?.hotel?.nombre || "").toLowerCase();
+
+    return (
+      codigoFolio.includes(terminoLimpio) ||
+      cliente.includes(terminoLimpio) ||
+      tel.includes(terminoLimpio) ||
+      correo.includes(terminoLimpio) ||
+      numHab.includes(terminoLimpio) ||
+      hotelNombre.includes(terminoLimpio)
+    );
+  });
+
+  const reservacionesOrdenadas = [...reservacionesFiltradas].sort(
     (a, b) => (b.id_reservacion || 0) - (a.id_reservacion || 0)
   );
-  const totalPaginas = Math.max(1, Math.ceil(reservacionesOrdenadas.length / registrosPorPagina));
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(reservacionesOrdenadas.length / registrosPorPagina)
+  );
   const paginaSegura = Math.min(paginaActual, totalPaginas);
   const indiceInicio = (paginaSegura - 1) * registrosPorPagina;
-  const indiceFin = Math.min(indiceInicio + registrosPorPagina, reservacionesOrdenadas.length);
+  const indiceFin = Math.min(
+    indiceInicio + registrosPorPagina,
+    reservacionesOrdenadas.length
+  );
   const reservacionesPaginadas = reservacionesOrdenadas.slice(
     indiceInicio,
     indiceInicio + registrosPorPagina
   );
+
+  // Generar ventana de botones numéricos (ej: 1 ... 4 5 6 ... 145)
+  const obtenerNumerosPagina = (): (number | string)[] => {
+    if (totalPaginas <= 7) {
+      return Array.from({ length: totalPaginas }, (_, i) => i + 1);
+    }
+    const paginas: (number | string)[] = [1];
+    const inicio = Math.max(2, paginaSegura - 1);
+    const fin = Math.min(totalPaginas - 1, paginaSegura + 1);
+
+    if (inicio > 2) paginas.push("...");
+    for (let i = inicio; i <= fin; i++) {
+      paginas.push(i);
+    }
+    if (fin < totalPaginas - 1) paginas.push("...");
+    paginas.push(totalPaginas);
+    return paginas;
+  };
 
   return (
     <div>
@@ -664,15 +713,89 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
           </div>
         </div>
 
+        {/* BARRA DE BÚSQUEDA Y FILTROS RÁPIDOS */}
+        <div
+          className="px-3 px-md-4 py-3 border-bottom"
+          style={{ backgroundColor: "#fafaf9" }}
+        >
+          <div className="row g-2 align-items-center">
+            <div className="col-12 col-md-6">
+              <div className="login-input-wrap">
+                <i className="bi bi-search login-input-icon"></i>
+                <input
+                  type="text"
+                  className="input-luxury"
+                  placeholder="Buscar por folio (ej. R80015), huésped, teléfono, hab. o sede..."
+                  value={busqueda}
+                  onChange={(e) => {
+                    setBusqueda(e.target.value);
+                    setPaginaActual(1);
+                  }}
+                />
+                {busqueda && (
+                  <button
+                    type="button"
+                    className="login-eye"
+                    onClick={() => {
+                      setBusqueda("");
+                      setPaginaActual(1);
+                    }}
+                    title="Limpiar búsqueda"
+                  >
+                    <i className="bi bi-x-lg"></i>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="col-7 col-md-4">
+              <select
+                className="input-luxury"
+                value={filtroEstadoTabla}
+                onChange={(e) => {
+                  setFiltroEstadoTabla(e.target.value);
+                  setPaginaActual(1);
+                }}
+              >
+                <option value="">Todos los estatus ({reservaciones.length})</option>
+                <option value="Pendiente">Pendientes de Pago</option>
+                <option value="Confirmada">Confirmadas (Por llegar)</option>
+                <option value="En Curso">En Curso (En el hotel)</option>
+                <option value="Finalizada">Finalizadas</option>
+                <option value="Cancelada">Canceladas</option>
+              </select>
+            </div>
+
+            <div className="col-5 col-md-2">
+              <select
+                className="input-luxury"
+                value={registrosPorPagina}
+                onChange={(e) => {
+                  setRegistrosPorPagina(Number(e.target.value));
+                  setPaginaActual(1);
+                }}
+                title="Registros por página"
+              >
+                <option value={7}>7 / pág.</option>
+                <option value={10}>10 / pág.</option>
+                <option value={25}>25 / pág.</option>
+                <option value={50}>50 / pág.</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         {/* VISTA DE CELULAR (< 768px) */}
         <div className="d-md-none p-2">
           {loading ? (
             <div className="text-center py-4 text-muted small">
               Cargando reservaciones...
             </div>
-          ) : reservaciones.length === 0 ? (
+          ) : reservacionesOrdenadas.length === 0 ? (
             <div className="text-center py-4 text-muted small">
-              No tienes reservaciones registradas actualmente.
+              {reservaciones.length === 0
+                ? "No tienes reservaciones registradas actualmente."
+                : "No se encontraron reservaciones con los filtros aplicados."}
             </div>
           ) : (
             <div className="d-flex flex-column gap-3">
@@ -847,10 +970,12 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
                     Cargando reservaciones...
                   </td>
                 </tr>
-              ) : reservaciones.length === 0 ? (
+              ) : reservacionesOrdenadas.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-4 text-muted">
-                    No tienes reservaciones registradas actualmente.
+                    {reservaciones.length === 0
+                      ? "No tienes reservaciones registradas actualmente."
+                      : "No se encontraron reservaciones con los filtros aplicados."}
                   </td>
                 </tr>
               ) : (
@@ -998,55 +1123,106 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
           </table>
         </div>
 
-        {/* CONTROLES DE PAGINACIÓN */}
-        {!loading && reservaciones.length > registrosPorPagina && (
-          <div className="d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-3 border-top gap-2">
+        {/* CONTROLES DE PAGINACIÓN MEJORADOS */}
+        {!loading && reservacionesOrdenadas.length > 0 && (
+          <div className="d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-3 border-top gap-3">
             <div className="text-muted small">
               Mostrando <strong>{indiceInicio + 1}</strong> – <strong>{indiceFin}</strong> de{" "}
-              <strong>{reservaciones.length}</strong> reservaciones
+              <strong>{reservacionesOrdenadas.length}</strong> reservaciones
+              {(busqueda || filtroEstadoTabla) && (
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm text-warning fw-semibold text-decoration-none p-0 ms-2"
+                  onClick={() => {
+                    setBusqueda("");
+                    setFiltroEstadoTabla("");
+                    setPaginaActual(1);
+                  }}
+                >
+                  Restablecer filtros
+                </button>
+              )}
             </div>
 
-            <div className="d-flex align-items-center gap-1">
-              <button
-                type="button"
-                className="btn-luxury-outline py-1 px-2 small"
-                disabled={paginaSegura === 1}
-                onClick={() => setPaginaActual(1)}
-                title="Primera página"
-              >
-                <i className="bi bi-chevron-double-left"></i>
-              </button>
-              <button
-                type="button"
-                className="btn-luxury-outline py-1 px-3 small"
-                disabled={paginaSegura === 1}
-                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
-              >
-                Anterior
-              </button>
+            {totalPaginas > 1 && (
+              <div className="d-flex flex-wrap align-items-center gap-1">
+                <button
+                  type="button"
+                  className="btn-luxury-outline py-1 px-2 small"
+                  disabled={paginaSegura === 1}
+                  onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+                  title="Página anterior"
+                >
+                  <i className="bi bi-chevron-left"></i>
+                </button>
 
-              <span className="px-2 px-md-3 small fw-semibold">
-                Pág. {paginaSegura} / {totalPaginas}
-              </span>
+                {obtenerNumerosPagina().map((item, idx) =>
+                  item === "..." ? (
+                    <span key={`dots-${idx}`} className="px-2 text-muted small">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setPaginaActual(Number(item))}
+                      className={
+                        paginaSegura === item
+                          ? "btn-luxury-primary py-1 px-2 small"
+                          : "btn-luxury-outline py-1 px-2 small"
+                      }
+                      style={{ minWidth: "34px", justifyContent: "center" }}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
 
-              <button
-                type="button"
-                className="btn-luxury-outline py-1 px-3 small"
-                disabled={paginaSegura === totalPaginas}
-                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
-              >
-                Siguiente
-              </button>
-              <button
-                type="button"
-                className="btn-luxury-outline py-1 px-2 small"
-                disabled={paginaSegura === totalPaginas}
-                onClick={() => setPaginaActual(totalPaginas)}
-                title="Última página"
-              >
-                <i className="bi bi-chevron-double-right"></i>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  className="btn-luxury-outline py-1 px-2 small"
+                  disabled={paginaSegura === totalPaginas}
+                  onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+                  title="Página siguiente"
+                >
+                  <i className="bi bi-chevron-right"></i>
+                </button>
+
+                {/* Salto directo a página cuando hay muchas páginas */}
+                {totalPaginas > 7 && (
+                  <form
+                    className="d-inline-flex align-items-center gap-1 ms-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const num = Number(saltoPaginaInput);
+                      if (num >= 1 && num <= totalPaginas) {
+                        setPaginaActual(num);
+                        setSaltoPaginaInput("");
+                      }
+                    }}
+                  >
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPaginas}
+                      placeholder="Ir a..."
+                      value={saltoPaginaInput}
+                      onChange={(e) => setSaltoPaginaInput(e.target.value)}
+                      className="input-luxury py-1 px-2 small text-center"
+                      style={{ width: "68px", height: "32px" }}
+                    />
+                    <button
+                      type="submit"
+                      className="btn-luxury-outline py-1 px-2 small"
+                      style={{ height: "32px" }}
+                      title="Ir a la página indicada"
+                    >
+                      Ir
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -34,6 +34,45 @@ const FOTOS_HOTELES_DEFAULT: Record<number, string> = {
     2: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1000&q=80",
 };
 
+// Estilos exclusivos del catálogo (prefijo "cat-" para no chocar con tu CSS global)
+const estilosCatalogo = `
+@keyframes catFade { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.cat-fade { animation: catFade .55s cubic-bezier(.2,.7,.2,1) both; }
+
+.cat-card {
+    cursor: pointer;
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.cat-card-room { cursor: default; }
+
+/* Fotos más bajas en celular para que se vean más tarjetas */
+.cat-hero { position: relative; height: 180px; overflow: hidden; }
+.cat-hero img { transition: transform .6s ease; }
+.cat-room-img { position: relative; height: 170px; overflow: hidden; }
+.cat-room-img img { transition: transform .6s ease; }
+
+@media (min-width: 576px) {
+    .cat-hero { height: 260px; }
+    .cat-room-img { height: 200px; }
+}
+
+@media (hover: hover) {
+    .cat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 18px 40px -18px rgba(24, 24, 27, 0.35) !important;
+    }
+    .cat-card:hover .cat-hero img,
+    .cat-card:hover .cat-room-img img { transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cat-fade { animation: none; }
+    .cat-card, .cat-hero img, .cat-room-img img { transition: none; }
+}
+`;
+
 const obtenerFechaLocalIso = (diasSumar = 0, fechaBase?: string): string => {
     const base = fechaBase ? new Date(fechaBase + "T00:00:00") : new Date();
     base.setDate(base.getDate() + diasSumar);
@@ -151,7 +190,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
         try {
             await crearReservacion(payload);
             setHabitacionParaReservar(null);
-            setExitoToast("¡Reservación exito! Redirigiendo a reservaciones ");
+            setExitoToast("¡Reservación creada con éxito! Redirigiendo a tus reservaciones...");
 
             // Damos 1.5 segundos para que lea la notificación antes de cambiar de vista
             setTimeout(() => {
@@ -169,6 +208,8 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
 
     return (
         <div>
+            <style>{estilosCatalogo}</style>
+
             {exitoToast && (
                 <div className="toast-alert alert alert-success border-0 rounded-4 shadow-sm d-flex justify-content-between align-items-center mb-4">
                     <div>
@@ -181,7 +222,8 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
 
             {!hotelSeleccionado && (
                 <div>
-                    <div className="d-flex justify-content-between align-items-center mb-4">
+                    {/* Encabezado: en celular el botón baja a todo el ancho */}
+                    <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4">
                         <div>
                             <span className="badge-soft badge-amber mb-2">
                                 <i className="bi bi-geo-alt-fill"></i>
@@ -192,18 +234,20 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                                 Elige en cuál de nuestros complejos hoteleros deseas hospedarte.
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            className="btn-luxury-outline"
-                            onClick={() => setHotelSeleccionado({ id_hotel: 0, nombre: "Todas las Sedes", ciudad: "Nacional" })}
-                        >
-                            <i className="bi bi-grid me-1"></i>
-                            <span>Ver todas las habitaciones</span>
-                        </button>
+                        <div className="d-grid d-sm-block flex-shrink-0">
+                            <button
+                                type="button"
+                                className="btn-luxury-outline text-nowrap"
+                                onClick={() => setHotelSeleccionado({ id_hotel: 0, nombre: "Todas las Sedes", ciudad: "Nacional" })}
+                            >
+                                <i className="bi bi-grid me-1"></i>
+                                <span>Ver todas las habitaciones</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="row g-4">
-                        {hoteles.map((hotel) => {
+                    <div className="row g-3 g-md-4">
+                        {hoteles.map((hotel, idx) => {
                             const fotoHotel =
                                 hotel.imagen_url ||
                                 (hotel.id_hotel ? FOTOS_HOTELES_DEFAULT[hotel.id_hotel] : undefined) ||
@@ -215,11 +259,11 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                             return (
                                 <div key={hotel.id_hotel} className="col-12 col-md-6">
                                     <div
-                                        className="luxury-card h-100 overflow-hidden shadow-sm"
-                                        style={{ transition: "transform 0.2s ease", cursor: "pointer" }}
+                                        className="luxury-card cat-card cat-fade h-100 overflow-hidden shadow-sm"
+                                        style={{ animationDelay: `${0.08 * idx}s` }}
                                         onClick={() => setHotelSeleccionado(hotel)}
                                     >
-                                        <div style={{ height: "260px", position: "relative" }}>
+                                        <div className="cat-hero">
                                             <img
                                                 src={fotoHotel}
                                                 alt={hotel.nombre}
@@ -239,7 +283,8 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                                             </div>
                                         </div>
 
-                                        <div className="p-4 d-flex justify-content-between align-items-center">
+                                        {/* Pie: en celular se apila (texto arriba, botón a todo el ancho) */}
+                                        <div className="p-3 p-md-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
                                             <div>
                                                 <small className="text-muted d-block">Capacidad de sede</small>
                                                 <span className="fw-semibold text-dark">
@@ -249,7 +294,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                                             </div>
                                             <button
                                                 type="button"
-                                                className="btn-luxury-primary"
+                                                className="btn-luxury-primary justify-content-center text-nowrap"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     setHotelSeleccionado(hotel);
@@ -269,7 +314,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
 
             {hotelSeleccionado && (
                 <div>
-                    <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+                    <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 mb-md-4 gap-3">
                         <div>
                             <h4 className="fw-bold mb-1">
                                 {hotelSeleccionado.id_hotel === 0
@@ -302,10 +347,11 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                         </div>
                     </div>
 
-                    <div className="luxury-card mb-4">
+                    <div className="luxury-card mb-3 mb-md-4">
                         <div className="p-3 bg-light">
                             <div className="row g-2 align-items-end">
-                                <div className="col-12 col-md-4">
+                                {/* Fechas lado a lado en celular para ahorrar espacio */}
+                                <div className="col-6 col-md-4">
                                     <label className="input-label small text-muted">Llegada (Check-in)</label>
                                     <input
                                         type="date"
@@ -321,7 +367,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                                     />
                                 </div>
 
-                                <div className="col-12 col-md-4">
+                                <div className="col-6 col-md-4">
                                     <label className="input-label small text-muted">Salida (Check-out)</label>
                                     <input
                                         type="date"
@@ -363,15 +409,18 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                             <p className="small mb-0">Intenta cambiar de categoría o seleccionar otras fechas.</p>
                         </div>
                     ) : (
-                        <div className="row g-4">
-                            {habitacionesVisibles.map((hab) => {
+                        <div className="row g-3 g-md-4">
+                            {habitacionesVisibles.map((hab, idx) => {
                                 const ocupada = hab.id_habitacion ? estaOcupadaEnFechas(hab.id_habitacion) : false;
                                 const imagen = resolverFotoHabitacion(hab);
 
                                 return (
                                     <div key={hab.id_habitacion} className="col-12 col-md-6 col-lg-4">
-                                        <div className="luxury-card h-100 d-flex flex-column shadow-sm position-relative">
-                                            <div className="position-relative" style={{ height: "200px" }}>
+                                        <div
+                                            className="luxury-card cat-card cat-card-room cat-fade h-100 d-flex flex-column shadow-sm position-relative"
+                                            style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s` }}
+                                        >
+                                            <div className="cat-room-img">
                                                 <img
                                                     src={imagen}
                                                     alt={hab.tipoHabitacion?.nombre || "Habitación"}
@@ -393,7 +442,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                                                 </div>
                                             </div>
 
-                                            <div className="p-4 d-flex flex-column flex-grow-1 justify-content-between">
+                                            <div className="p-3 p-md-4 d-flex flex-column flex-grow-1 justify-content-between">
                                                 <div>
                                                     <h6 className="fw-bold mb-1 text-dark">
                                                         {hab.tipoHabitacion?.nombre || "Estándar"}

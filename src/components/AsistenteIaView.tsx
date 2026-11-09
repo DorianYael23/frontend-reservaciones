@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { type SesionUsuario } from "./LoginView";
+import { API_URL } from "../services/api";
 
 type TipoGraficaGerente = "temporadas" | "anios" | "meses" | "hoteles" | "categorias";
 
@@ -33,53 +34,57 @@ interface DatoGrafica {
 }
 
 const STORAGE_MODEL_KEY = "paraiso_ai_selected_model_v4";
-const hostActual = typeof window !== "undefined" ? window.location.hostname : "localhost";
-const API_ROOT = (import.meta as any).env?.VITE_API_URL || `http://${hostActual}:8082/api`;
-const API_BASE_URL = `${API_ROOT}/hotel-ai`;
-const API_RESERVACIONES_URL = `${API_ROOT}/reservaciones`;
+const API_BASE_URL = `${API_URL}/hotel-ai`;
+const API_RESERVACIONES_URL = `${API_URL}/reservaciones`;
 
 const CONSULTAS_RAPIDAS_GERENTE: {
   id: TipoGraficaGerente;
   titulo: string;
+  corto: string;
   icono: string;
   pregunta: string;
 }[] = [
-  {
-    id: "temporadas",
-    titulo: "Ocupación e Ingresos por Temporada",
-    icono: "bi-sun-fill",
-    pregunta:
-      "Genera la gráfica y análisis estadístico de reservaciones e ingresos por Temporada Turística (Alta, Media y Baja).",
-  },
-  {
-    id: "anios",
-    titulo: "Crecimiento Anual (2020 - 2026)",
-    icono: "bi-graph-up-arrow",
-    pregunta:
-      "Muéstrame la gráfica de evolución anual de reservaciones e ingresos desde 2020 hasta 2026.",
-  },
-  {
-    id: "meses",
-    titulo: "Comportamiento Mensual",
-    icono: "bi-calendar3-range",
-    pregunta:
-      "Genera la gráfica comparativa de reservaciones e ingresos acumulados por cada mes del año.",
-  },
-  {
-    id: "hoteles",
-    titulo: "Comparativa por Sede (CDMX vs Cancún)",
-    icono: "bi-buildings",
-    pregunta:
-      "Compara en gráfica el rendimiento de reservaciones e ingresos entre Hotel Paraíso CDMX y Hotel Paraíso Ejecutivo Cancún.",
-  },
-  {
-    id: "categorias",
-    titulo: "Rentabilidad por Tipo de Habitación",
-    icono: "bi-pie-chart-fill",
-    pregunta:
-      "Muéstrame la gráfica de rentabilidad y demanda por categoría de habitación (Sencilla, Doble y Suite Presidencial).",
-  },
-];
+    {
+      id: "temporadas",
+      titulo: "Ocupación e Ingresos por Temporada",
+      corto: "Temporadas",
+      icono: "bi-sun-fill",
+      pregunta:
+        "Genera la gráfica y análisis estadístico de reservaciones e ingresos por Temporada Turística (Alta, Media y Baja).",
+    },
+    {
+      id: "anios",
+      titulo: "Crecimiento Anual (2020 - 2026)",
+      corto: "Crecimiento anual",
+      icono: "bi-graph-up-arrow",
+      pregunta:
+        "Muéstrame la gráfica de evolución anual de reservaciones e ingresos desde 2020 hasta 2026.",
+    },
+    {
+      id: "meses",
+      titulo: "Comportamiento Mensual",
+      corto: "Mensual",
+      icono: "bi-calendar3-range",
+      pregunta:
+        "Genera la gráfica comparativa de reservaciones e ingresos acumulados por cada mes del año.",
+    },
+    {
+      id: "hoteles",
+      titulo: "Comparativa por Sede (CDMX vs Cancún)",
+      corto: "Por sede",
+      icono: "bi-buildings",
+      pregunta:
+        "Compara en gráfica el rendimiento de reservaciones e ingresos entre Hotel Paraíso CDMX y Hotel Paraíso Ejecutivo Cancún.",
+    },
+    {
+      id: "categorias",
+      titulo: "Rentabilidad por Tipo de Habitación",
+      corto: "Categorías",
+      icono: "bi-pie-chart-fill",
+      pregunta:
+        "Muéstrame la gráfica de rentabilidad y demanda por categoría de habitación (Sencilla, Doble y Suite Presidencial).",
+    },
+  ];
 
 const detectarTipoGrafica = (pregunta: string): TipoGraficaGerente | undefined => {
   const q = pregunta.toLowerCase();
@@ -564,9 +569,13 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
     try {
       await fetch(`${API_BASE_URL}/sesiones`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sesion.token}`,
+        },
         body: JSON.stringify({
           id: conv.id,
+          id_usuario: sesion.id_usuario,
           title: conv.title,
           updatedAt: conv.updatedAt,
           messagesJson: JSON.stringify(conv.messages),
@@ -581,7 +590,11 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
     const cargarSesionesDelServidor = async () => {
       if (!sesion?.token) return;
       try {
-        const res = await fetch(`${API_BASE_URL}/sesiones`);
+        const res = await fetch(`${API_BASE_URL}/sesiones`, {
+          headers: {
+            Authorization: `Bearer ${sesion.token}`,
+          },
+        });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -767,9 +780,8 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
     const dataAccion = await respAccion.json().catch(() => ({}));
 
     if (!respAccion.ok) {
-      return `⚠️ **No se pudo completar el ${pideCheckIn ? "Check-in" : "Check-out"} del folio ${folioBuscado}:** ${
-        dataAccion.mensaje || "Verifica que la reservación esté Confirmada y en fecha válida."
-      }`;
+      return `⚠️ **No se pudo completar el ${pideCheckIn ? "Check-in" : "Check-out"} del folio ${folioBuscado}:** ${dataAccion.mensaje || "Verifica que la reservación esté Confirmada y en fecha válida."
+        }`;
     }
 
     cargarReservacionesParaRol();
@@ -1001,14 +1013,14 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
             minHeight: "480px",
           }}
         >
-          {/* CABECERA MÓVIL ULTRA COMPACTA */}
+          {/* CABECERA MÓVIL: UNA SOLA FILA, SIN DESBORDES */}
           <div
-            className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
+            className="d-flex align-items-center justify-content-between gap-2 px-2 py-2 border-bottom"
             style={{ backgroundColor: "#18181b", color: "#ffffff", flexShrink: 0 }}
           >
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex align-items-center gap-2" style={{ minWidth: 0 }}>
               <div
-                className="rounded-3 d-flex align-items-center justify-content-center"
+                className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
                 style={{
                   width: 32,
                   height: 32,
@@ -1018,34 +1030,41 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
               >
                 <i className="bi bi-stars"></i>
               </div>
-              <div>
-                <div className="fw-bold" style={{ fontSize: "0.88rem", lineHeight: 1.1 }}>
+              <div style={{ minWidth: 0 }}>
+                <div
+                  className="fw-bold text-truncate"
+                  style={{ fontSize: "0.88rem", lineHeight: 1.1, whiteSpace: "nowrap" }}
+                >
                   Asistente IA
                 </div>
-                <small style={{ fontSize: "0.68rem", color: "#a1a1aa" }}>
+                <small
+                  className="d-block text-truncate"
+                  style={{ fontSize: "0.68rem", color: "#a1a1aa", whiteSpace: "nowrap" }}
+                >
                   ● {modelo === "gemini" ? "Gemini" : "Llama 3.2"}
                 </small>
               </div>
             </div>
 
             {/* Acciones Rápidas Móvil */}
-            <div className="d-flex align-items-center gap-1">
-              <select
-                value={modelo}
-                onChange={(e) => setModelo(e.target.value as "gemini" | "llama3.2:3b")}
-                className="form-select form-select-sm border-0 fw-semibold"
+            <div className="d-flex align-items-center gap-1 flex-shrink-0">
+              {/* Cambio de motor: botón compacto (toca para alternar) */}
+              <button
+                type="button"
+                onClick={() => setModelo((m) => (m === "gemini" ? "llama3.2:3b" : "gemini"))}
+                className="btn btn-sm d-flex align-items-center justify-content-center"
                 style={{
-                  width: "auto",
-                  fontSize: "0.74rem",
+                  width: 32,
+                  height: 32,
                   backgroundColor: "#27272a",
                   color: "#fbbf24",
-                  paddingRight: "1.6rem",
+                  borderRadius: "8px",
                 }}
-                aria-label="Seleccionar modelo"
+                title={`Motor: ${modelo === "gemini" ? "Gemini" : "Llama 3.2"} (toca para cambiar)`}
+                aria-label="Cambiar motor de IA"
               >
-                <option value="gemini">☁️ Gemini</option>
-                <option value="llama3.2:3b">💻 Llama 3.2</option>
-              </select>
+                <i className={`bi ${modelo === "gemini" ? "bi-cloud" : "bi-pc-display"}`}></i>
+              </button>
 
               <button
                 type="button"
@@ -1156,7 +1175,7 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                     <div
                       className="rounded-4 px-3 py-2 text-white shadow-sm"
                       style={{
-                        maxWidth: "85%",
+                        maxWidth: "90%",
                         backgroundColor: "#18181b",
                         fontSize: "0.9rem",
                         lineHeight: "1.45",
@@ -1202,9 +1221,9 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
               return (
                 <div key={msg.id} className="d-flex justify-content-start">
                   <div
-                    className="rounded-4 p-3 shadow-sm"
+                    className="rounded-4 px-3 py-2 shadow-sm"
                     style={{
-                      width: "94%",
+                      width: "100%",
                       backgroundColor: "#ffffff",
                       border: "1px solid #e4e4e7",
                       fontSize: "0.9rem",
@@ -1443,74 +1462,22 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
       </div>
 
       {/* =========================================================================
-          2. VISTA DE TABLET Y ESCRITORIO (>= 768px) — DISEÑO ORIGINAL INTACTO
+          2. VISTA DE TABLET Y ESCRITORIO (>= 768px)
+          - Motor de IA ahora vive en el encabezado del chat.
+          - Gráficas rápidas del gerente: barra horizontal sobre el chat.
+          - Barra lateral: solo historial (más alto y más limpio).
+          - En tablet la barra lateral queda al costado (antes se apilaba).
          ========================================================================= */}
       <div className="d-none d-md-block">
-        <div className="row g-4">
-          {/* PANEL LATERAL (.ia-sidebar) */}
-          <div className="col-lg-4 col-xl-3">
+        <div className="row g-3 g-lg-4">
+          {/* PANEL LATERAL (.ia-sidebar) — SOLO HISTORIAL */}
+          <div className="col-md-4 col-lg-3 col-xl-3">
             <aside className="ia-sidebar">
-              {/* Selector de Motor */}
-              <div className="luxury-card ia-engine-card">
-                <div className="ia-engine-top">
-                  <span className="ia-engine-label">
-                    <i className="bi bi-cpu"></i>
-                    Motor de IA
-                  </span>
-                  <span className="badge-soft badge-emerald">
-                    <span className="dot"></span> Activo
-                  </span>
-                </div>
-                <div className="ia-segment">
-                  <button
-                    type="button"
-                    className={`ia-segment-btn ${modelo === "gemini" ? "active" : ""}`}
-                    onClick={() => setModelo("gemini")}
-                  >
-                    <i className="bi bi-cloud"></i> Gemini
-                  </button>
-                  <button
-                    type="button"
-                    className={`ia-segment-btn ${modelo === "llama3.2:3b" ? "active" : ""}`}
-                    onClick={() => setModelo("llama3.2:3b")}
-                  >
-                    <i className="bi bi-pc-display"></i> Llama 3.2
-                  </button>
-                </div>
-              </div>
-
-              {/* PANEL DE CONSULTAS RÁPIDAS EXCLUSIVO PARA EL GERENTE */}
-              {esGerente && (
-                <div className="luxury-card p-3 mb-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
-                    <div className="fw-semibold small text-dark d-flex align-items-center gap-2">
-                      <i className="bi bi-bar-chart-line-fill text-warning"></i>
-                      <span>Consultas Rápidas (Gráficas)</span>
-                    </div>
-                    <span className="badge-soft badge-amber" style={{ fontSize: "0.68rem" }}>
-                      Gerencia
-                    </span>
-                  </div>
-                  <div className="d-flex flex-column gap-1">
-                    {CONSULTAS_RAPIDAS_GERENTE.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        disabled={loading}
-                        onClick={() => enviarPregunta(item.pregunta, item.id)}
-                        className="btn btn-sm btn-light text-start border rounded-3 py-2 px-2 d-flex align-items-center gap-2"
-                      >
-                        <i className={`bi ${item.icono} text-warning`}></i>
-                        <span className="small fw-medium text-dark text-truncate">{item.titulo}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Historial de Consultas */}
-              <div className="luxury-card p-3 d-flex flex-column gap-2" style={{ maxHeight: "calc(100dvh - 360px)" }}>
-                <div className="d-flex align-items-center justify-content-between pb-2 border-bottom">
+              <div
+                className="luxury-card p-3 d-flex flex-column gap-2"
+                style={{ maxHeight: "calc(100dvh - 210px)", minHeight: "420px" }}
+              >
+                <div className="d-flex align-items-center justify-content-between gap-2 pb-2 border-bottom">
                   <div style={{ minWidth: 0 }}>
                     <div className="ia-engine-label">
                       <i className="bi bi-clock-history"></i>
@@ -1522,7 +1489,7 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                   </div>
                   <button
                     type="button"
-                    className="btn-luxury-primary py-1 px-2"
+                    className="btn-luxury-primary py-1 px-2 flex-shrink-0"
                     style={{ fontSize: "0.78rem" }}
                     onClick={handleNuevaConversacion}
                   >
@@ -1569,14 +1536,14 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
           </div>
 
           {/* CONSOLA DE CHAT (.ia-console) */}
-          <div className="col-lg-8 col-xl-9">
+          <div className="col-md-8 col-lg-9 col-xl-9">
             <section className="luxury-card ia-console">
-              <div className="luxury-card-header py-3">
-                <div className="d-flex align-items-center gap-3">
+              <div className="luxury-card-header py-3 flex-wrap gap-2">
+                <div className="d-flex align-items-center gap-3" style={{ minWidth: 0 }}>
                   <div className="ia-avatar">
                     <i className="bi bi-stars"></i>
                   </div>
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <h6 className="fw-bold mb-0">Asistente de IA</h6>
                     <small className="text-muted">
                       {modelo === "gemini" ? "Google Gemini" : "Ollama Llama 3.2:3b"}
@@ -1584,8 +1551,32 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                   </div>
                 </div>
 
-                {!esGerente && (
-                  <div className="d-flex align-items-center gap-2">
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  {/* Selector de motor, ahora compacto en el encabezado */}
+                  <div
+                    className="ia-segment"
+                    style={{ width: "auto", display: "inline-flex", flexShrink: 0 }}
+                    title="Motor de IA"
+                  >
+                    <button
+                      type="button"
+                      className={`ia-segment-btn ${modelo === "gemini" ? "active" : ""}`}
+                      onClick={() => setModelo("gemini")}
+                      style={{ padding: "0.3rem 0.8rem", whiteSpace: "nowrap" }}
+                    >
+                      <i className="bi bi-cloud"></i> Gemini
+                    </button>
+                    <button
+                      type="button"
+                      className={`ia-segment-btn ${modelo === "llama3.2:3b" ? "active" : ""}`}
+                      onClick={() => setModelo("llama3.2:3b")}
+                      style={{ padding: "0.3rem 0.8rem", whiteSpace: "nowrap" }}
+                    >
+                      <i className="bi bi-pc-display"></i> Llama 3.2
+                    </button>
+                  </div>
+
+                  {!esGerente && (
                     <button
                       type="button"
                       className={`btn-luxury-outline py-1 px-3 ${fechasAbiertas ? "bg-warning-subtle border-warning" : ""}`}
@@ -1594,9 +1585,36 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                       <i className="bi bi-calendar-check me-2 text-warning"></i>
                       Fechas de estancia
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
+
+              {/* GRÁFICAS RÁPIDAS DEL GERENTE: barra horizontal compacta */}
+              {esGerente && (
+                <div
+                  className="px-3 py-2 border-bottom d-flex align-items-center gap-2 overflow-x-auto"
+                  style={{ backgroundColor: "#fafaf9", whiteSpace: "nowrap" }}
+                >
+                  <span className="small fw-semibold text-muted flex-shrink-0">
+                    <i className="bi bi-bar-chart-line-fill text-warning me-1"></i>
+                    Gráficas:
+                  </span>
+                  {CONSULTAS_RAPIDAS_GERENTE.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={loading}
+                      title={item.titulo}
+                      onClick={() => enviarPregunta(item.pregunta, item.id)}
+                      className="btn-luxury-outline py-1 px-3 rounded-pill flex-shrink-0"
+                      style={{ fontSize: "0.78rem" }}
+                    >
+                      <i className={`bi ${item.icono} text-warning me-1`}></i>
+                      {item.corto}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {!esGerente && fechasAbiertas && (
                 <div className="px-4 py-2 bg-warning-subtle border-bottom d-flex align-items-end gap-3 flex-wrap">
