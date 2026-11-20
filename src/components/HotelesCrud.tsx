@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Hotel } from '../types';
 import { obtenerHoteles, crearHotel, actualizarHotel, eliminarHotel } from '../services/api';
+import { SkeletonBox, TableSkeletonRows } from './Skeletons';
 
 const hotelInicial: Hotel = {
     nombre: '',
@@ -13,6 +14,7 @@ const hotelInicial: Hotel = {
 
 export default function HotelesCrud() {
     const [hoteles, setHoteles] = useState<Hotel[]>([]);
+    const [loading, setLoading] = useState(true);
     const [form, setForm] = useState<Hotel>(hotelInicial);
     const [editandoId, setEditandoId] = useState<number | null>(null);
 
@@ -28,10 +30,13 @@ export default function HotelesCrud() {
     const [erroresCampo, setErroresCampo] = useState<Record<string, string>>({});
 
     const cargarDatos = async () => {
+        setLoading(true);
         try {
             setHoteles(await obtenerHoteles());
         } catch {
             setErrorBanner('No se pudo conectar con el servidor.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -109,7 +114,9 @@ export default function HotelesCrud() {
                     <div className="stat-box d-flex justify-content-between align-items-center">
                         <div>
                             <div className="text-muted small fw-medium">Propiedades Registradas</div>
-                            <div className="fs-3 fw-bold mt-1">{hoteles.length}</div>
+                            <div className="fs-3 fw-bold mt-1">
+                                {loading ? <SkeletonBox width={44} height={30} /> : hoteles.length}
+                            </div>
                         </div>
                         <i className="bi bi-buildings fs-2 text-muted opacity-50"></i>
                     </div>
@@ -118,7 +125,9 @@ export default function HotelesCrud() {
                     <div className="stat-box d-flex justify-content-between align-items-center">
                         <div>
                             <div className="text-muted small fw-medium">Complejos en Operación</div>
-                            <div className="fs-3 fw-bold mt-1" style={{ color: '#065f46' }}>{activos}</div>
+                            <div className="fs-3 fw-bold mt-1" style={{ color: '#065f46' }}>
+                                {loading ? <SkeletonBox width={44} height={30} /> : activos}
+                            </div>
                         </div>
                         <i className="bi bi-check2-circle fs-2 text-success opacity-50"></i>
                     </div>
@@ -127,7 +136,9 @@ export default function HotelesCrud() {
                     <div className="stat-box d-flex justify-content-between align-items-center">
                         <div>
                             <div className="text-muted small fw-medium">Sedes Inactivas</div>
-                            <div className="fs-3 fw-bold text-muted mt-1">{hoteles.length - activos}</div>
+                            <div className="fs-3 fw-bold text-muted mt-1">
+                                {loading ? <SkeletonBox width={44} height={30} /> : hoteles.length - activos}
+                            </div>
                         </div>
                         <i className="bi bi-pause-circle fs-2 text-muted opacity-50"></i>
                     </div>
@@ -173,39 +184,52 @@ export default function HotelesCrud() {
                             </tr>
                         </thead>
                         <tbody>
-                            {hoteles.map((h) => (
-                                <tr key={h.id_hotel}>
-                                    <td>
-                                        <div className="fw-bold">{h.nombre}</div>
-                                        <small className="text-muted">Código #{h.id_hotel}</small>
-                                    </td>
-                                    <td>
-                                        <div className="fw-medium">{h.ciudad}</div>
-                                        <small className="text-muted">{h.direccion}</small>
-                                    </td>
-                                    <td>
-                                        <div>{h.telefono}</div>
-                                        <small className="text-muted">{h.email}</small>
-                                    </td>
-                                    <td>
-                                        <span className={`badge-soft ${h.activo ? 'badge-emerald' : 'badge-stone'}`}>
-                                            <span className="dot"></span>
-                                            {h.activo ? 'Operando' : 'Inactivo'}
-                                        </span>
-                                    </td>
-                                    <td className="text-end">
-                                        <button className="action-icon-btn me-1" title="Ver Ficha" onClick={() => setHotelDetalle(h)}>
-                                            <i className="bi bi-eye"></i>
-                                        </button>
-                                        <button className="action-icon-btn me-1" title="Editar" onClick={() => abrirModalEditar(h)}>
-                                            <i className="bi bi-pencil"></i>
-                                        </button>
-                                        <button className="action-icon-btn delete" title="Eliminar" onClick={() => setHotelAEliminar(h)}>
-                                            <i className="bi bi-trash3"></i>
-                                        </button>
+                            {loading ? (
+                                <TableSkeletonRows
+                                    columns={['two-line', 'two-line', 'two-line', 'pill', 'actions']}
+                                    rows={4}
+                                />
+                            ) : hoteles.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="text-center py-4 text-muted">
+                                        No hay propiedades hoteleras registradas.
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                hoteles.map((h) => (
+                                    <tr key={h.id_hotel}>
+                                        <td>
+                                            <div className="fw-bold">{h.nombre}</div>
+                                            <small className="text-muted">Código #{h.id_hotel}</small>
+                                        </td>
+                                        <td>
+                                            <div className="fw-medium">{h.ciudad}</div>
+                                            <small className="text-muted">{h.direccion}</small>
+                                        </td>
+                                        <td>
+                                            <div>{h.telefono}</div>
+                                            <small className="text-muted">{h.email}</small>
+                                        </td>
+                                        <td>
+                                            <span className={`badge-soft ${h.activo ? 'badge-emerald' : 'badge-stone'}`}>
+                                                <span className="dot"></span>
+                                                {h.activo ? 'Operando' : 'Inactivo'}
+                                            </span>
+                                        </td>
+                                        <td className="text-end">
+                                            <button className="action-icon-btn me-1" title="Ver Ficha" onClick={() => setHotelDetalle(h)}>
+                                                <i className="bi bi-eye"></i>
+                                            </button>
+                                            <button className="action-icon-btn me-1" title="Editar" onClick={() => abrirModalEditar(h)}>
+                                                <i className="bi bi-pencil"></i>
+                                            </button>
+                                            <button className="action-icon-btn delete" title="Eliminar" onClick={() => setHotelAEliminar(h)}>
+                                                <i className="bi bi-trash3"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

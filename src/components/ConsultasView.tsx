@@ -8,6 +8,11 @@ import {
     obtenerHoteles,
     obtenerTipos,
 } from '../services/api';
+import {
+    DashboardConsultasSkeleton,
+    ResumenSedesSkeleton,
+    TableSkeletonRows,
+} from './Skeletons';
 
 const API_RESERVACIONES = `${API_URL}/reservaciones`;
 
@@ -166,6 +171,7 @@ export default function ConsultasView() {
     const [filtroSedeDash, setFiltroSedeDash] = useState('');
 
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
     const formatoMoneda = (valor: number) =>
         new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor || 0);
@@ -185,6 +191,7 @@ export default function ConsultasView() {
 
     const cargarConsultas = async () => {
         setError(null);
+        setLoading(true);
         try {
             const [resDisp, resDist, resCont, resHot, resTip, resReservas] = await Promise.all([
                 consultarDisponibles(),
@@ -202,6 +209,8 @@ export default function ConsultasView() {
             setReservaciones(Array.isArray(resReservas) ? resReservas : []);
         } catch {
             setError('Error al sincronizar los reportes con la base de datos.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -373,9 +382,9 @@ export default function ConsultasView() {
                     </button>
                 </div>
 
-                <button className="btn-luxury-outline" onClick={cargarConsultas}>
+                <button className="btn-luxury-outline" onClick={cargarConsultas} disabled={loading}>
                     <i className="bi bi-arrow-clockwise me-2"></i>
-                    Actualizar Datos
+                    {loading ? 'Actualizando...' : 'Actualizar Datos'}
                 </button>
             </div>
 
@@ -383,6 +392,9 @@ export default function ConsultasView() {
                 {error && <div className="alert alert-danger">{error}</div>}
 
                 {vistaReporte === 'dashboard' && (
+                    loading ? (
+                        <DashboardConsultasSkeleton />
+                    ) : (
                     <div>
                         <div
                             className="row g-3 mb-4 p-3 rounded-4 border wow-fade"
@@ -984,6 +996,7 @@ export default function ConsultasView() {
                             </div>
                         </div>
                     </div>
+                    )
                 )}
 
                 {vistaReporte === 'recepcion' && (
@@ -1029,7 +1042,28 @@ export default function ConsultasView() {
                             </div>
                         </div>
 
-                        {disponiblesFiltradas.length === 0 ? (
+                        {loading ? (
+                            <div className="table-responsive border rounded-4">
+                                <table className="table-luxury">
+                                    <thead>
+                                        <tr>
+                                            <th>Propiedad</th>
+                                            <th>Unidad</th>
+                                            <th>Nivel</th>
+                                            <th>Categoría</th>
+                                            <th>Capacidad</th>
+                                            <th>Tarifa Base</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <TableSkeletonRows
+                                            columns={['text', 'pill', 'short', 'text', 'short', 'short']}
+                                            rows={6}
+                                        />
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : disponiblesFiltradas.length === 0 ? (
                             <div className="text-center py-5">
                                 <i className="bi bi-calendar2-x fs-1 text-muted"></i>
                                 <h6 className="fw-bold mt-2">No existen habitaciones disponibles actualmente</h6>
@@ -1080,28 +1114,38 @@ export default function ConsultasView() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {distribucion.map((item, idx) => (
-                                    <tr key={idx}>
-                                        <td className="fw-bold">{item.hotel}</td>
-                                        <td><span className="badge-soft badge-stone">#{item.habitacion}</span></td>
-                                        <td>Piso {item.piso}</td>
-                                        <td>
-                                            <span className={`badge-soft ${badgeClass(item.estado)}`}>
-                                                <span className="dot"></span>
-                                                {item.estado}
-                                            </span>
-                                        </td>
-                                        <td>{item.tipo}</td>
-                                        <td>{item.capacidad} personas</td>
-                                        <td className="fw-bold" style={{ color: '#065f46' }}>{formatoMoneda(item.precioBase)}</td>
-                                    </tr>
-                                ))}
+                                {loading ? (
+                                    <TableSkeletonRows
+                                        columns={['text', 'pill', 'short', 'pill', 'text', 'short', 'short']}
+                                        rows={6}
+                                    />
+                                ) : (
+                                    distribucion.map((item, idx) => (
+                                        <tr key={idx}>
+                                            <td className="fw-bold">{item.hotel}</td>
+                                            <td><span className="badge-soft badge-stone">#{item.habitacion}</span></td>
+                                            <td>Piso {item.piso}</td>
+                                            <td>
+                                                <span className={`badge-soft ${badgeClass(item.estado)}`}>
+                                                    <span className="dot"></span>
+                                                    {item.estado}
+                                                </span>
+                                            </td>
+                                            <td>{item.tipo}</td>
+                                            <td>{item.capacidad} personas</td>
+                                            <td className="fw-bold" style={{ color: '#065f46' }}>{formatoMoneda(item.precioBase)}</td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
                 )}
 
                 {vistaReporte === 'resumen' && (
+                    loading ? (
+                        <ResumenSedesSkeleton count={4} />
+                    ) : (
                     <div className="row g-3">
                         {conteo.map((item, idx) => (
                             <div className="col-md-6" key={idx}>
@@ -1124,6 +1168,7 @@ export default function ConsultasView() {
                             </div>
                         ))}
                     </div>
+                    )
                 )}
             </div>
         </div>

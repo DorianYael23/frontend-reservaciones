@@ -14,6 +14,7 @@ import {
     obtenerOcupacionFechas,
     crearReservacion,
 } from "../services/api";
+import { CatalogoHabitacionesSkeleton, CatalogoHotelesSkeleton } from "./Skeletons";
 
 interface CatalogoProps {
     sesion: SesionUsuario;
@@ -246,6 +247,9 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                         </div>
                     </div>
 
+                    {loading ? (
+                        <CatalogoHotelesSkeleton count={2} />
+                    ) : (
                     <div className="row g-3 g-md-4">
                         {hoteles.map((hotel, idx) => {
                             const fotoHotel =
@@ -309,6 +313,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                             );
                         })}
                     </div>
+                    )}
                 </div>
             )}
 
@@ -398,10 +403,7 @@ export const CatalogoHabitacionesView: React.FC<CatalogoProps> = ({
                     </div>
 
                     {loading ? (
-                        <div className="text-center py-5 text-muted">
-                            <div className="spinner-border text-warning mb-2" role="status" />
-                            <div>Cargando habitaciones...</div>
-                        </div>
+                        <CatalogoHabitacionesSkeleton count={6} />
                     ) : habitacionesVisibles.length === 0 ? (
                         <div className="luxury-card p-5 text-center text-muted">
                             <i className="bi bi-door-closed fs-1 text-secondary opacity-50 mb-2 d-block"></i>

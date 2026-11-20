@@ -6,6 +6,7 @@ import {
   actualizarUsuario,
   eliminarUsuario,
 } from "../services/api";
+import { TableSkeletonRows } from "./Skeletons";
 
 type RolUsuario = "ADMIN" | "GERENTE" | "RECEPCIONISTA" | "HUESPED";
 
@@ -189,11 +190,10 @@ export const UsuariosCrud: React.FC = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-4 text-muted">
-                    Cargando usuarios...
-                  </td>
-                </tr>
+                <TableSkeletonRows
+                  columns={["two-line", "text", "pill", "pill", "short", "actions"]}
+                  rows={5}
+                />
               ) : usuarios.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-4 text-muted">

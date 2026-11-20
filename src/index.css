@@ -1715,3 +1715,58 @@ body {
   .exec-logout,
   .exec-logout i { transition: none; }
 }
+
+/* =========================================================
+   SKELETON LOADERS (TEMA LUXURY STONE & ZINC)
+   ========================================================= */
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    #ecebe9 25%,
+    #f7f6f4 50%,
+    #ecebe9 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.45s ease-in-out infinite;
+}
+
+.skeleton-dark {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08) 25%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.08) 75%
+  );
+  background-size: 200% 100%;
+}
+
+.skeleton-pill {
+  border-radius: 999px;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: #ecebe9;
+  }
+  .skeleton-dark {
+    background: rgba(255, 255, 255, 0.12);
+  }
+}

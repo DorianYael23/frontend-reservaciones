@@ -8,11 +8,13 @@ import {
     actualizarHabitacion,
     eliminarHabitacion,
 } from '../services/api';
+import { TableSkeletonRows } from './Skeletons';
 
 export default function HabitacionesCrud() {
     const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
     const [hoteles, setHoteles] = useState<Hotel[]>([]);
     const [tipos, setTipos] = useState<TipoHabitacion[]>([]);
+    const [loading, setLoading] = useState(true);
 
     const formInicial = {
         id_hotel: '',
@@ -44,6 +46,7 @@ export default function HabitacionesCrud() {
     };
 
     const cargarTodo = async () => {
+        setLoading(true);
         try {
             const [habs, hots, tips] = await Promise.all([
                 obtenerHabitaciones(),
@@ -55,6 +58,8 @@ export default function HabitacionesCrud() {
             setTipos(tips);
         } catch {
             setErrorBanner('Error al cargar el inventario de habitaciones.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -182,42 +187,55 @@ export default function HabitacionesCrud() {
                             </tr>
                         </thead>
                         <tbody>
-                            {habitaciones.map((ha) => (
-                                <tr key={ha.id_habitacion}>
-                                    <td>
-                                        <div className="fw-bold">{ha.hotel?.nombre}</div>
-                                        <small className="text-muted">{ha.hotel?.ciudad}</small>
-                                    </td>
-                                    <td>
-                                        <span className="fw-bold">Habitación #{ha.numero}</span>
-                                        <small className="text-muted d-block">Piso {ha.piso}</small>
-                                    </td>
-                                    <td>
-                                        <div className="fw-medium">{ha.tipoHabitacion?.nombre}</div>
-                                        <small className="text-muted">Máx. {ha.tipoHabitacion?.capacidad} personas</small>
-                                    </td>
-                                    <td className="fw-bold" style={{ color: '#065f46' }}>
-                                        {formatoMoneda(ha.tipoHabitacion?.precio_base || 0)}
-                                    </td>
-                                    <td>
-                                        <span className={`badge-soft ${badgeClass(ha.estado)}`}>
-                                            <span className="dot"></span>
-                                            {ha.estado}
-                                        </span>
-                                    </td>
-                                    <td className="text-end">
-                                        <button className="action-icon-btn me-1" title="Ver Detalle" onClick={() => setHabDetalle(ha)}>
-                                            <i className="bi bi-eye"></i>
-                                        </button>
-                                        <button className="action-icon-btn me-1" title="Editar" onClick={() => abrirModalEditar(ha)}>
-                                            <i className="bi bi-pencil"></i>
-                                        </button>
-                                        <button className="action-icon-btn delete" title="Eliminar" onClick={() => setHabAEliminar(ha)}>
-                                            <i className="bi bi-trash3"></i>
-                                        </button>
+                            {loading ? (
+                                <TableSkeletonRows
+                                    columns={['two-line', 'two-line', 'two-line', 'short', 'pill', 'actions']}
+                                    rows={6}
+                                />
+                            ) : habitaciones.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="text-center py-4 text-muted">
+                                        No hay habitaciones registradas en el inventario.
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                habitaciones.map((ha) => (
+                                    <tr key={ha.id_habitacion}>
+                                        <td>
+                                            <div className="fw-bold">{ha.hotel?.nombre}</div>
+                                            <small className="text-muted">{ha.hotel?.ciudad}</small>
+                                        </td>
+                                        <td>
+                                            <span className="fw-bold">Habitación #{ha.numero}</span>
+                                            <small className="text-muted d-block">Piso {ha.piso}</small>
+                                        </td>
+                                        <td>
+                                            <div className="fw-medium">{ha.tipoHabitacion?.nombre}</div>
+                                            <small className="text-muted">Máx. {ha.tipoHabitacion?.capacidad} personas</small>
+                                        </td>
+                                        <td className="fw-bold" style={{ color: '#065f46' }}>
+                                            {formatoMoneda(ha.tipoHabitacion?.precio_base || 0)}
+                                        </td>
+                                        <td>
+                                            <span className={`badge-soft ${badgeClass(ha.estado)}`}>
+                                                <span className="dot"></span>
+                                                {ha.estado}
+                                            </span>
+                                        </td>
+                                        <td className="text-end">
+                                            <button className="action-icon-btn me-1" title="Ver Detalle" onClick={() => setHabDetalle(ha)}>
+                                                <i className="bi bi-eye"></i>
+                                            </button>
+                                            <button className="action-icon-btn me-1" title="Editar" onClick={() => abrirModalEditar(ha)}>
+                                                <i className="bi bi-pencil"></i>
+                                            </button>
+                                            <button className="action-icon-btn delete" title="Eliminar" onClick={() => setHabAEliminar(ha)}>
+                                                <i className="bi bi-trash3"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

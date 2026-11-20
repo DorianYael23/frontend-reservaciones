@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { type SesionUsuario } from "./LoginView";
 import { API_URL } from "../services/api";
+import {
+  ReservacionesMobileSkeleton,
+  SkeletonBox,
+  TableSkeletonRows,
+} from "./Skeletons";
 
 interface Hotel {
   id_hotel: number;
@@ -604,7 +609,9 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
               <div className="text-muted small fw-medium" style={{ fontSize: "0.75rem" }}>
                 {esAdmin ? "Por Llegar" : "Próximas"}
               </div>
-              <h4 className="fw-bold mb-0 mt-1">{totalPendientesConfirmadas}</h4>
+              <h4 className="fw-bold mb-0 mt-1">
+                {loading ? <SkeletonBox width={38} height={24} /> : totalPendientesConfirmadas}
+              </h4>
             </div>
             <div className="brand-badge d-none d-sm-flex">
               <i className="bi bi-journal-bookmark"></i>
@@ -618,7 +625,9 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
               <div className="text-muted small fw-medium" style={{ fontSize: "0.75rem" }}>
                 {esAdmin ? "Activos" : "En Curso"}
               </div>
-              <h4 className="fw-bold mb-0 mt-1">{totalEnCurso}</h4>
+              <h4 className="fw-bold mb-0 mt-1">
+                {loading ? <SkeletonBox width={38} height={24} /> : totalEnCurso}
+              </h4>
             </div>
             <div className="brand-badge d-none d-sm-flex">
               <i className="bi bi-door-closed"></i>
@@ -632,7 +641,9 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
               <div className="text-muted small fw-medium" style={{ fontSize: "0.75rem" }}>
                 Total
               </div>
-              <h4 className="fw-bold mb-0 mt-1">{reservaciones.length}</h4>
+              <h4 className="fw-bold mb-0 mt-1">
+                {loading ? <SkeletonBox width={38} height={24} /> : reservaciones.length}
+              </h4>
             </div>
             <div className="brand-badge d-none d-sm-flex">
               <i className="bi bi-calendar2-week"></i>
@@ -790,9 +801,7 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
         {/* VISTA DE CELULAR (< 768px) */}
         <div className="d-md-none p-2">
           {loading ? (
-            <div className="text-center py-4 text-muted small">
-              Cargando reservaciones...
-            </div>
+            <ReservacionesMobileSkeleton count={3} />
           ) : reservacionesOrdenadas.length === 0 ? (
             <div className="text-center py-4 text-muted small">
               {reservaciones.length === 0
@@ -967,11 +976,18 @@ export const ReservacionesCrud: React.FC<ReservacionesCrudProps> = ({ sesion }) 
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-4 text-muted">
-                    Cargando reservaciones...
-                  </td>
-                </tr>
+                <TableSkeletonRows
+                  columns={[
+                    "two-line",
+                    "two-line",
+                    "two-line",
+                    "two-line",
+                    "short",
+                    "pill",
+                    "actions-wide",
+                  ]}
+                  rows={6}
+                />
               ) : reservacionesOrdenadas.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-4 text-muted">

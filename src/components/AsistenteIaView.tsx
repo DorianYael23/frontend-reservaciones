@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { type SesionUsuario } from "./LoginView";
 import { API_URL } from "../services/api";
+import { ChatHistorySkeleton } from "./Skeletons";
 
 type TipoGraficaGerente = "temporadas" | "anios" | "meses" | "hoteles" | "categorias";
 
@@ -350,6 +351,7 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingSesiones, setLoadingSesiones] = useState(true);
   const [reservacionesBD, setReservacionesBD] = useState<any[]>([]);
 
   // UI estados (Desktop/Tablet + Móvil)
@@ -588,7 +590,11 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
 
   useEffect(() => {
     const cargarSesionesDelServidor = async () => {
-      if (!sesion?.token) return;
+      if (!sesion?.token) {
+        setLoadingSesiones(false);
+        return;
+      }
+      setLoadingSesiones(true);
       try {
         const res = await fetch(`${API_BASE_URL}/sesiones`, {
           headers: {
@@ -632,6 +638,8 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
         }
       } catch {
         // Ignorar
+      } finally {
+        setLoadingSesiones(false);
       }
       const inicial = crearSesionInicial(sesion?.nombre, generarNuevoIdSesion(), rolActual);
       setConversations([inicial]);
@@ -1421,7 +1429,10 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
               </div>
 
               <div className="overflow-y-auto d-flex flex-column gap-2 py-1">
-                {conversations.map((conv, index) => {
+                {loadingSesiones ? (
+                  <ChatHistorySkeleton count={4} />
+                ) : (
+                conversations.map((conv, index) => {
                   const esActiva = conv.id === activeConversation.id;
                   return (
                     <div
@@ -1454,7 +1465,8 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                       </button>
                     </div>
                   );
-                })}
+                })
+                )}
               </div>
             </div>
           </div>
@@ -1498,7 +1510,10 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                 </div>
 
                 <div className="overflow-y-auto d-flex flex-column gap-2 pe-1">
-                  {conversations.map((conv, index) => {
+                  {loadingSesiones ? (
+                    <ChatHistorySkeleton count={5} />
+                  ) : (
+                  conversations.map((conv, index) => {
                     const esActiva = conv.id === activeConversation.id;
                     return (
                       <div
@@ -1529,7 +1544,8 @@ export const AsistenteIaView: React.FC<AsistenteIaViewProps> = ({ sesion }) => {
                         </button>
                       </div>
                     );
-                  })}
+                  })
+                  )}
                 </div>
               </div>
             </aside>

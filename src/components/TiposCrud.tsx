@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { TipoHabitacion } from '../types';
 import { obtenerTipos, crearTipo, actualizarTipo, eliminarTipo } from '../services/api';
+import { TableSkeletonRows } from './Skeletons';
 
 const tipoInicial: TipoHabitacion = {
     nombre: '',
@@ -11,6 +12,7 @@ const tipoInicial: TipoHabitacion = {
 
 export default function TiposCrud() {
     const [tipos, setTipos] = useState<TipoHabitacion[]>([]);
+    const [loading, setLoading] = useState(true);
     const [form, setForm] = useState<TipoHabitacion>(tipoInicial);
     const [editandoId, setEditandoId] = useState<number | null>(null);
 
@@ -27,10 +29,13 @@ export default function TiposCrud() {
         new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor || 0);
 
     const cargarDatos = async () => {
+        setLoading(true);
         try {
             setTipos(await obtenerTipos());
         } catch {
             setErrorBanner('No se pudo cargar el catálogo de categorías.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -138,40 +143,53 @@ export default function TiposCrud() {
                             </tr>
                         </thead>
                         <tbody>
-                            {tipos.map((t) => (
-                                <tr key={t.id_tipo}>
-                                    <td>
-                                        <div className="fw-bold">{t.nombre}</div>
-                                        <small className="text-muted">ID #{t.id_tipo}</small>
-                                    </td>
-                                    <td className="text-muted" style={{ maxWidth: 380 }}>
-                                        {t.descripcion || 'Sin descripción'}
-                                    </td>
-                                    <td>
-                                        <span className="badge-soft badge-stone">
-                                            <i className="bi bi-people me-1"></i>
-                                            {t.capacidad} {t.capacidad === 1 ? 'huésped' : 'huéspedes'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span className="fw-bold fs-6" style={{ color: '#065f46' }}>
-                                            {formatoMoneda(t.precio_base)}
-                                        </span>
-                                        <small className="text-muted d-block">por noche</small>
-                                    </td>
-                                    <td className="text-end">
-                                        <button className="action-icon-btn me-1" title="Detalle" onClick={() => setTipoDetalle(t)}>
-                                            <i className="bi bi-eye"></i>
-                                        </button>
-                                        <button className="action-icon-btn me-1" title="Editar" onClick={() => abrirModalEditar(t)}>
-                                            <i className="bi bi-pencil"></i>
-                                        </button>
-                                        <button className="action-icon-btn delete" title="Eliminar" onClick={() => setTipoAEliminar(t)}>
-                                            <i className="bi bi-trash3"></i>
-                                        </button>
+                            {loading ? (
+                                <TableSkeletonRows
+                                    columns={['two-line', 'text', 'pill', 'price', 'actions']}
+                                    rows={4}
+                                />
+                            ) : tipos.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="text-center py-4 text-muted">
+                                        No hay categorías registradas.
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                tipos.map((t) => (
+                                    <tr key={t.id_tipo}>
+                                        <td>
+                                            <div className="fw-bold">{t.nombre}</div>
+                                            <small className="text-muted">ID #{t.id_tipo}</small>
+                                        </td>
+                                        <td className="text-muted" style={{ maxWidth: 380 }}>
+                                            {t.descripcion || 'Sin descripción'}
+                                        </td>
+                                        <td>
+                                            <span className="badge-soft badge-stone">
+                                                <i className="bi bi-people me-1"></i>
+                                                {t.capacidad} {t.capacidad === 1 ? 'huésped' : 'huéspedes'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span className="fw-bold fs-6" style={{ color: '#065f46' }}>
+                                                {formatoMoneda(t.precio_base)}
+                                            </span>
+                                            <small className="text-muted d-block">por noche</small>
+                                        </td>
+                                        <td className="text-end">
+                                            <button className="action-icon-btn me-1" title="Detalle" onClick={() => setTipoDetalle(t)}>
+                                                <i className="bi bi-eye"></i>
+                                            </button>
+                                            <button className="action-icon-btn me-1" title="Editar" onClick={() => abrirModalEditar(t)}>
+                                                <i className="bi bi-pencil"></i>
+                                            </button>
+                                            <button className="action-icon-btn delete" title="Eliminar" onClick={() => setTipoAEliminar(t)}>
+                                                <i className="bi bi-trash3"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
